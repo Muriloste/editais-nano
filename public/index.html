@@ -191,7 +191,7 @@ label.chk{display:flex;gap:.35rem;align-items:center;font-size:.85rem;color:var(
 <div class="wrap">
 
 <div class="verbar">
-  <span class="tag">v7.4 · 08/11/2026</span>
+  <span class="tag">v7.5 · 08/11/2026</span>
   <span>Novo: Abertos mostra só o que falta triar — ao marcar Interesse, Vamos participar ou Descartar, o edital vai para a aba correspondente. Aviso de certidões vencidas da pasta-mestre no topo. Pipeline: "✅ Vamos participar" no card leva o edital para a aba Pipeline; a rodada seguinte (7h06/13h06) cria a pasta no SharePoint, copia os documentos da pasta-mestre e monta o checklist. Depois: Proposta enviada → Ganhamos / Perdemos / Desistimos.</span>
   <span class="spacer"></span>
   <button class="btn-theme" id="themeBtn" type="button">Tema</button>
@@ -594,6 +594,7 @@ function blocoPipeline(rec){
          (perdida ? '<span class="pill warn">a rodada de ' + esc(perdida.toLocaleString("pt-BR", { weekday:"short", hour:"2-digit", minute:"2-digit" })) + ' não rodou</span>' : '');
   }
   else if(p.pasta_status === "criando") h += '<span class="pill">criando a pasta e o checklist…</span>';
+  else if(p.pasta_status === "erro" && /PNCP fora do ar/i.test(p.erro || "")) h += '<span class="pill warn">PNCP fora do ar</span><span class="meta">pasta e checklist tentam de novo na rodada de ' + esc(fmtRodada(proximaRodada())) + '</span>';
   else if(p.pasta_status === "erro") h += '<span class="pill warn">pasta/checklist falhou</span><span class="meta">' + esc((p.erro || "").slice(0, 160)) + '</span><button class="mark" type="button" data-act="pedirPasta">tentar de novo</button>';
   else if(p.pasta_status === "pronta"){
     const rz = p.resumo || {};
@@ -729,6 +730,7 @@ function blocoAnalise(rec){
          '<button class="mark" type="button" data-act="cancelarAnalise">cancelar</button>';
   }
   else if(a.status === "processando") h += '<span class="pill">analisando os documentos…</span>';
+  else if(a.status === "erro" && /PNCP fora do ar/i.test(a.erro || "")) h += '<span class="pill warn">PNCP fora do ar</span><span class="meta">tenta de novo na rodada de ' + esc(fmtRodada(proximaRodada())) + '</span>';
   else if(a.status === "erro") h += '<span class="pill warn">pré-análise falhou</span><span class="meta">' + esc((a.erro || "").slice(0, 160)) + '</span><button class="mark" type="button" data-act="pedir">tentar de novo</button>';
   else if(a.status === "pronta"){
     const rz = a.resumo || {};
@@ -1456,6 +1458,7 @@ async function extrair(buf, nome){
   if(/\.txt$/i.test(nome || "")) return { tipo:"txt", texto: new TextDecoder().decode(buf) };
   return { tipo:"desconhecido (" + magic.replace(/[^\x20-\x7e]/g, "?") + ")", texto:"" };
 }
+const PNCP_FORA = /PNCP fora do ar/i;   // falha que a próxima rodada tenta de novo sozinha
 function dadosSnap(id, snap){
   const it = (snap && snap.it) || {};
   return { id, orgao: it.orgao_nome, unidade: it.unidade_nome, municipio: it.municipio_nome, uf: it.uf, km: snap && snap.km,
@@ -1487,15 +1490,19 @@ async function apiPart(caminho, metodo, corpo){
   return r.json();
 }
 window.nanoAnalise = {
-  versao: 3,
+  versao: 4,
   async fila(){
     const r = await fetchT("/api/analises", { cache:"no-store" }, 20000);
     if(!r.ok) throw new Error("API de análises respondeu " + r.status);
     const j = await r.json();
-    return (j.analises || []).filter(a => a.status === "pendente").map(a => {
-      if(a.snap) filaSnaps.set(a.id, a.snap);
-      return { ...dadosSnap(a.id, a.snap), pedido_em: a.pedido_em };
-    });
+    // pendentes + os que falharam só porque o PNCP estava fora do ar; quem fecha antes vem primeiro
+    return (j.analises || []).filter(a => a.status === "pendente" || (a.status === "erro" && PNCP_FORA.test(a.erro || "")))
+      .map(a => {
+        if(a.snap) filaSnaps.set(a.id, a.snap);
+        const fim = a.snap && a.snap.fim ? new Date(a.snap.fim) : null;
+        return { ...dadosSnap(a.id, a.snap), pedido_em: a.pedido_em, nova_tentativa: a.status === "erro", encerrado: !!(fim && fim < new Date()) };
+      })
+      .sort((x, y) => (x.encerrado - y.encerrado) || (String(x.encerramento || "9").localeCompare(String(y.encerramento || "9"))));
   },
   async marcar(id, status, extra){
     const r = await fetchT("/api/analises/" + encodeURIComponent(id), { method:"PUT", headers:{"content-type":"application/json"}, body: JSON.stringify({ status, ...(extra || {}) }) }, 20000);
@@ -1543,8 +1550,8 @@ window.nanoAnalise = {
     const j = await apiPart("");
     let an = new Map();
     try{ const ra = await fetchT("/api/analises", { cache:"no-store" }, 20000); if(ra.ok) an = new Map(((await ra.json()).analises || []).map(a => [a.id, a])); }catch(e){}
-    return (j.participacoes || []).filter(p => p.pasta_status === "pendente")
-      .sort((a, b) => String(a.pasta_pedida_em).localeCompare(String(b.pasta_pedida_em)))
+    return (j.participacoes || []).filter(p => p.pasta_status === "pendente" || (p.pasta_status === "erro" && PNCP_FORA.test(p.erro || "")))
+      .sort((a, b) => String((a.snap || {}).fim || "9").localeCompare(String((b.snap || {}).fim || "9")))
       .map(p => {
         if(p.snap) filaSnaps.set(p.id, p.snap);
         return { ...dadosSnap(p.id, p.snap), etapa: p.etapa, pasta_pedida_em: p.pasta_pedida_em,
