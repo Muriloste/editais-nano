@@ -67,7 +67,7 @@ a{color:var(--accent-blue)}
 .kicker{font-family:"JetBrains Mono",monospace;color:#C6FA1E;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600}
 .hero h1{font-size:clamp(1.6rem,3.6vw,2.3rem);font-weight:800;margin:.35rem 0 .4rem;line-height:1.15}
 .hero p{margin:0;color:#D9D7F5;max-width:660px}
-.funil{display:grid;grid-template-columns:repeat(auto-fit,minmax(108px,1fr));gap:.75rem;margin-top:1.5rem}
+.funil{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:.75rem;margin-top:1.5rem}
 .funil div{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.10);border-radius:12px;padding:.7rem .8rem}
 .funil b{display:block;font-family:"JetBrains Mono",monospace;font-variant-numeric:tabular-nums;font-size:1.6rem;line-height:1.1}
 .funil span{font-size:.72rem;color:#C9C6EE;text-transform:uppercase;letter-spacing:.04em}
@@ -81,34 +81,40 @@ a{color:var(--accent-blue)}
 .chip.sub{font-size:.76rem;padding:.2rem .6rem}
 .chip[aria-pressed="true"]{background:var(--accent-blue);border-color:var(--accent-blue);color:var(--on-accent)}
 .chip.sub[aria-pressed="true"]{background:var(--accent-blue-soft);color:var(--accent-blue);border-color:var(--accent-blue)}
-select,input[type=search]{font:inherit;font-size:.88rem;color:var(--text);background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:.38rem .6rem}
+select,input[type=search],input[type=text]{font:inherit;font-size:.88rem;color:var(--text);background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:.38rem .6rem}
 input[type=search]{flex:1;min-width:180px}
 label.chk{display:flex;gap:.35rem;align-items:center;font-size:.85rem;color:var(--text-soft);cursor:pointer}
 .btn{font:inherit;font-size:.85rem;font-weight:600;border-radius:10px;padding:.42rem .85rem;cursor:pointer;border:1px solid var(--border);background:var(--surface-2);color:var(--text)}
 .btn.primary{background:var(--accent-blue);border-color:var(--accent-blue);color:var(--on-accent)}
 .btn:disabled{opacity:.55;cursor:default}
 .status{font-size:.82rem;color:var(--text-soft)}
+.sync{font-size:.75rem;color:var(--text-faint)}
+.sync.ok{color:var(--rule-mark)}
 
 .alert{margin-top:1.25rem;background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--accent-lime);border-radius:12px;padding:.85rem 1rem;font-size:.88rem;color:var(--text-soft)}
 .alert b{color:var(--text)}
 .alert ul{margin:.35rem 0 0;padding-left:1.1rem}
 
-.sec{display:flex;align-items:baseline;gap:.6rem;margin:2rem 0 .75rem}
-.sec h2{font-size:1.15rem;font-weight:700}
-.sec .count{font-family:"JetBrains Mono",monospace;color:var(--text-faint);font-size:.85rem}
+.tabs{display:flex;gap:.35rem;flex-wrap:wrap;margin:2rem 0 .9rem;border-bottom:1px solid var(--border)}
+.tab{font:inherit;font-family:Poppins,Inter,sans-serif;font-weight:600;font-size:.92rem;background:transparent;border:0;border-bottom:3px solid transparent;color:var(--text-soft);padding:.45rem .75rem;cursor:pointer;margin-bottom:-1px}
+.tab[aria-selected="true"]{color:var(--text);border-bottom-color:var(--accent-lime)}
+.tab .n{font-family:"JetBrains Mono",monospace;font-size:.78rem;color:var(--text-faint);margin-left:.2rem}
+.count{font-family:"JetBrains Mono",monospace;color:var(--text-faint);font-size:.82rem;margin:-.4rem 0 .75rem}
 
 .list{display:grid;gap:.75rem}
 .ed{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--accent-blue);border-radius:14px;padding:.95rem 1rem;box-shadow:var(--shadow)}
 .ed.urg{border-left-color:var(--warn)}
 .ed.soon{border-left-color:var(--amber)}
 .ed.weak{opacity:.82;border-left-style:dashed}
-.ed.disc{opacity:.45}
+.ed.disc{border-left-color:var(--text-faint)}
 .ed .top{display:flex;flex-wrap:wrap;gap:.35rem;align-items:center}
 .pill{font-size:.7rem;font-weight:600;border-radius:999px;padding:.12rem .55rem;background:var(--accent-blue-soft);color:var(--accent-blue);white-space:nowrap}
 .pill small{font-weight:500;opacity:.8}
 .pill.lime{background:var(--accent-lime-soft);color:var(--track-b-text)}
 .pill.ghost{background:transparent;border:1px dashed var(--border);color:var(--text-faint)}
 .pill.new{background:var(--call-bg);color:var(--call-text)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.ok{background:var(--accent-lime-soft);color:var(--track-b-text);border:1px solid var(--accent-lime)}
 .ed .days{margin-left:auto;font-family:"JetBrains Mono",monospace;font-variant-numeric:tabular-nums;font-size:.8rem;color:var(--text-soft);white-space:nowrap}
 .ed h3{font-size:1rem;font-weight:600;margin:.5rem 0 .15rem;line-height:1.3}
 .ed .meta{font-size:.8rem;color:var(--text-faint)}
@@ -116,25 +122,43 @@ label.chk{display:flex;gap:.35rem;align-items:center;font-size:.85rem;color:var(
 .ed .obj{margin:.5rem 0 .6rem;font-size:.9rem;color:var(--text);overflow-wrap:anywhere}
 .ed .itens{margin:-.2rem 0 .6rem;background:var(--surface-2);border-radius:8px;padding:.45rem .65rem;font-size:.8rem;color:var(--text-soft);display:grid;gap:.2rem;overflow-wrap:anywhere}
 .ed .itens b{font-family:"JetBrains Mono",monospace;font-variant-numeric:tabular-nums;color:var(--text);font-weight:600}
+.ed .motivo-lido{margin:-.2rem 0 .6rem;font-size:.82rem;color:var(--warn)}
 .ed .foot{display:flex;flex-wrap:wrap;gap:.5rem .9rem;align-items:center;font-size:.82rem}
 .ed .foot .val{font-family:"JetBrains Mono",monospace;font-variant-numeric:tabular-nums;font-weight:600}
 .ed .foot .sp{flex:1}
 .mark{font:inherit;font-size:.78rem;border:1px solid var(--border);background:var(--surface-2);color:var(--text-soft);border-radius:8px;padding:.2rem .55rem;cursor:pointer}
 .mark[aria-pressed="true"].int{background:var(--accent-lime-soft);color:var(--track-b-text);border-color:var(--accent-lime)}
-.mark[aria-pressed="true"].dis{background:var(--warn-soft);color:var(--warn);border-color:var(--warn)}
+.motivos{margin-top:.7rem;border-top:1px dashed var(--border);padding-top:.7rem;display:grid;gap:.5rem}
+.motivos .q{font-size:.82rem;font-weight:600;color:var(--text)}
+.motivos .opts{display:flex;flex-wrap:wrap;gap:.35rem}
+.mot{font:inherit;font-size:.78rem;border:1px solid var(--border);background:var(--surface-2);color:var(--text);border-radius:999px;padding:.25rem .65rem;cursor:pointer}
+.mot:hover{border-color:var(--warn);color:var(--warn)}
+.motivos .obs{display:flex;gap:.4rem;flex-wrap:wrap}
+.motivos .obs input{flex:1;min-width:180px}
 .empty{background:var(--surface);border:1px dashed var(--border);border-radius:14px;padding:1.5rem;text-align:center;color:var(--text-soft)}
+
+.learn{display:grid;gap:1rem}
+.learn .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1rem 1.1rem;box-shadow:var(--shadow)}
+.learn h3{font-size:1rem;margin-bottom:.5rem}
+.learn .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem}
+.learn table{width:100%;border-collapse:collapse;font-size:.85rem}
+.learn td{padding:.3rem .2rem;border-bottom:1px solid var(--border)}
+.learn td.n{text-align:right;font-family:"JetBrains Mono",monospace;font-variant-numeric:tabular-nums;width:4rem}
+.learn .words{display:flex;flex-wrap:wrap;gap:.35rem}
+.learn p{margin:.2rem 0;color:var(--text-soft);font-size:.88rem}
+
 .src{margin-top:2.5rem;font-size:.78rem;color:var(--text-faint);border-top:1px solid var(--border);padding-top:1rem}
 .toast{position:fixed;left:50%;bottom:1.25rem;transform:translateX(-50%);background:var(--call-bg);color:var(--call-text);padding:.55rem 1rem;border-radius:10px;font-size:.85rem;box-shadow:var(--shadow);opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.on{opacity:1}
-@media print{.controls,.mark,.btn-theme{display:none}.ed,.hero{break-inside:avoid-page}*{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+@media print{.controls,.mark,.btn-theme,.tabs{display:none}.ed,.hero{break-inside:avoid-page}*{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
 </style>
 </head>
 <body>
 <div class="wrap">
 
 <div class="verbar">
-  <span class="tag">v4 · 08/11/2026</span>
-  <span>Filtro "★ Só interesse": mostra os editais marcados, inclusive os que já encerraram ou saíram da busca.</span>
+  <span class="tag">v5 · 08/11/2026</span>
+  <span>Abas de Interesse e Descartados, motivo ao descartar, marcações sincronizadas entre aparelhos e pontuação que aprende com as suas escolhas.</span>
   <span class="spacer"></span>
   <button class="btn-theme" id="themeBtn" type="button">Tema</button>
 </div>
@@ -144,13 +168,13 @@ label.chk{display:flex;gap:.35rem;align-items:center;font-size:.85rem;color:var(
   <h1>Editais abertos para a Nano</h1>
   <p>Licitações recebendo proposta agora: Sophos, Acronis e Microsoft no Brasil todo, e suporte de TI só perto de Leme. O objeto e a lista de itens de cada edital são conferidos.</p>
   <div class="funil">
-    <div><b id="nTotal">–</b><span>Abertos no raio</span></div>
+    <div><b id="nTotal">–</b><span>Abertos</span></div>
     <div class="hot"><b id="n7">–</b><span>Fecham em 7 dias</span></div>
     <div><b id="nSeg">–</b><span>Sophos</span></div>
     <div><b id="nBackup">–</b><span>Backup</span></div>
     <div><b id="nM365">–</b><span>Microsoft</span></div>
     <div><b id="nSup">–</b><span>Suporte TI</span></div>
-    <div><b id="nLD">–</b><span>No Licitar Digital</span></div>
+    <div><b id="nLD">–</b><span>Licitar Digital</span></div>
     <div class="hot"><b id="nInt">–</b><span>★ Interesse</span></div>
   </div>
 </header>
@@ -182,43 +206,47 @@ label.chk{display:flex;gap:.35rem;align-items:center;font-size:.85rem;color:var(
     <select id="ordem" aria-label="Ordenar">
       <option value="prazo">Ordenar por prazo</option>
       <option value="km">Ordenar por distância</option>
+      <option value="relevancia">Ordenar pelo que aprendi</option>
     </select>
   </div>
   <div class="row">
     <input type="search" id="busca" placeholder="Filtrar por órgão, cidade ou palavra do objeto">
   </div>
   <div class="row">
-    <label class="chk"><input type="checkbox" id="soInt"> <b>★ Só interesse</b> (<span id="cInt">0</span>)</label>
     <label class="chk"><input type="checkbox" id="fracos"> Mostrar possíveis (termo só nos anexos)</label>
-    <label class="chk"><input type="checkbox" id="ocultarDesc" checked> Ocultar descartados</label>
     <label class="chk"><input type="checkbox" id="soLD"> Só Licitar Digital</label>
+    <label class="chk"><input type="checkbox" id="ocultarProv"> Ocultar prováveis descartes</label>
   </div>
   <div class="row">
     <button class="btn primary" id="btnAtualizar" type="button">Atualizar do PNCP</button>
     <button class="btn" id="btnCsv" type="button">Exportar CSV</button>
     <button class="btn" id="btnZap" type="button">Copiar p/ WhatsApp</button>
     <span class="status" id="status">Carregando…</span>
+    <span class="sync" id="sync"></span>
   </div>
 </section>
 
 <div class="alert">
   <b>Como ler:</b> cada card é um edital com proposta aberta. A busca usa termos genéricos (firewall, EDR, XDR, backup em nuvem, licença Microsoft…) porque marca quase nunca aparece no objeto.
   <ul>
-    <li><b>Confirmado no objeto</b>: o termo está na descrição do edital (para suporte, também precisa ter contexto de TI).</li>
-    <li><b>Confirmado nos itens</b>: o termo está em um item da lista, por exemplo um "gateway de rede com firewall" dentro de uma ata de informática. O card mostra qual item.</li>
-    <li><b>Possível</b>: o PNCP achou o termo, mas só nos anexos (TR, edital em PDF). Fica oculto por padrão.</li>
-    <li><b>Suporte de TI</b> só aparece até o raio escolhido (150 ou 200 km de Leme). <b>Sophos, backup e Microsoft</b> vêm do Brasil todo; use UF ou alcance para afunilar.</li>
-    <li><b>★ Interesse</b> e <b>✕ Descartar</b> ficam salvos neste aparelho e neste endereço. Marque "★ Só interesse" para ver só os seus, inclusive os que já encerraram.</li>
-    <li>A linha <b>Wi-Fi/switch</b> começa desligada porque traz muita compra de switch comum. Ligue quando quiser ver.</li>
+    <li><b>Confirmado no objeto</b> ou <b>nos itens</b> (o card mostra o item). <b>Possível</b>: o termo só aparece nos anexos; fica oculto por padrão.</li>
+    <li><b>Suporte de TI</b> só até o raio escolhido; <b>Sophos, backup e Microsoft</b> no Brasil todo.</li>
+    <li><b>★ Interesse</b> e <b>✕ Descartar</b> (com motivo) vão para as abas próprias e valem no celular e no computador. Com algumas marcações, o monitor passa a sinalizar o que <b>parece interesse</b> e o que <b>parece descarte</b>; a aba <b>O que aprendi</b> mostra por quê.</li>
   </ul>
 </div>
 
-<div class="sec"><h2>Editais</h2><span class="count" id="countLbl"></span></div>
+<div class="tabs" role="tablist">
+  <button class="tab" role="tab" data-aba="abertos" aria-selected="true" type="button">Abertos<span class="n" id="tAb"></span></button>
+  <button class="tab" role="tab" data-aba="interesse" aria-selected="false" type="button">★ Interesse<span class="n" id="tInt"></span></button>
+  <button class="tab" role="tab" data-aba="descartados" aria-selected="false" type="button">✕ Descartados<span class="n" id="tDesc"></span></button>
+  <button class="tab" role="tab" data-aba="aprendizado" aria-selected="false" type="button">O que aprendi</button>
+</div>
+<div class="count" id="countLbl"></div>
 <div class="list" id="lista"><div class="empty">Consultando o PNCP…</div></div>
 
 <div class="src">
   Fonte: API de busca do PNCP (pncp.gov.br/api/search, editais com status "recebendo proposta"; suporte restrito a SP e MG), API de itens do PNCP (pncp.gov.br/api/pncp/v1/…/itens) e API de consulta do PNCP para valor estimado e link do sistema de origem. Os dados são consultados toda vez que a página abre ou ao clicar em Atualizar; a conferência de itens fica guardada por 12 horas neste navegador. Distâncias em linha reta a partir das coordenadas IBGE dos municípios.
-  Marcações (interesse/descartado) e "novo" ficam salvas só neste navegador.
+  As marcações e motivos ficam no banco do monitor (Cloudflare D1), com histórico de cada decisão; se o banco não responder, ficam neste aparelho e sobem na próxima abertura.
   <span id="lastRun"></span>
 </div>
 </div>
@@ -295,28 +323,104 @@ const nomeCat = c => (CATS[c].grupo === "sophos" ? "Sophos · " : "") + CATS[c].
 const $ = s => document.querySelector(s);
 const norm = s => (s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase();
 const esc = s => String(s==null?"":s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const API = /^https?:$/.test(location.protocol) ? "/api/marcas" : null;
 
 // ---- armazenamento local (tolerante a falhas)
 const store = {
   get(k, d){ try{ const v = localStorage.getItem("nanoEditais."+k); return v ? JSON.parse(v) : d; }catch(e){ return d; } },
   set(k, v){ try{ localStorage.setItem("nanoEditais."+k, JSON.stringify(v)); }catch(e){} }
 };
-let marks = store.get("marks", {});
-let snaps = store.get("snaps", {}); // cópia dos editais com interesse, para não sumirem quando saem da busca
-const SNAP_CAMPOS = ["orgao_nome","unidade_nome","municipio_nome","uf","description","title","modalidade_licitacao_nome","item_url","usuario_nome","orgao_cnpj","ano","numero_sequencial","valor_global","codigo_ibge"];
-function snapshot(rec){
-  const it = {}; SNAP_CAMPOS.forEach(k => { if(rec.it[k] != null) it[k] = rec.it[k]; });
-  return { id: rec.id, km: rec.km, fim: rec.fim ? rec.fim.toISOString() : null, ini: rec.ini ? rec.ini.toISOString() : null,
-           so: [...rec.strong], si: [...(rec.strongItens || [])], cats: [...rec.cats], itens: rec.itens || null, it };
-}
-function deSnap(s){
-  return { id: s.id, it: s.it, km: s.km, fim: s.fim ? new Date(s.fim) : null, ini: s.ini ? new Date(s.ini) : null,
-           n: norm((s.it.title||"") + " " + (s.it.description||"")), cats: new Set(s.cats || []), strong: new Set(s.so || []),
-           strongItens: new Set(s.si || []), itens: s.itens, _snap: true };
-}
 let itensCache = store.get("itens", {});
 const prevSeen = new Set(store.get("seen", []));
 const firstVisit = prevSeen.size === 0;
+
+// ---- marcações: id -> "interesse" | "descartado"; motivos: id -> {m, obs}; snaps: cópia do edital
+let marks = store.get("marks", {});
+let motivos = store.get("motivos", {});
+let snaps = store.get("snaps", {});
+let pendentes = new Set(store.get("pendentes", []));
+let apiOk = false;
+let servidorIds = new Set();
+
+const MOTIVOS = [
+  ["escopo", "Fora do nosso escopo"],
+  ["erp", "Sistema de gestão / software específico"],
+  ["hardware", "Só equipamento / hardware"],
+  ["longe", "Longe ou exige presença"],
+  ["valor", "Valor baixo"],
+  ["exigencia", "Exigência que não atendemos"],
+  ["prazo", "Prazo curto"],
+  ["marca", "Marca concorrente exigida"],
+  ["duplicado", "Duplicado / já visto"],
+  ["outro", "Outro"]
+];
+const nomeMotivo = c => (MOTIVOS.find(m => m[0] === c) || [c, c || "sem motivo"])[1];
+
+const SNAP_CAMPOS = ["orgao_nome","unidade_nome","municipio_nome","uf","description","title","modalidade_licitacao_nome","item_url","usuario_nome","orgao_cnpj","ano","numero_sequencial","valor_global","codigo_ibge"];
+function snapshot(rec){
+  const it = {}; SNAP_CAMPOS.forEach(k => { if(rec.it[k] != null) it[k] = rec.it[k]; });
+  const d = details.get(rec.id) || {};
+  return { id: rec.id, km: rec.km, fim: rec.fim ? rec.fim.toISOString() : null, ini: rec.ini ? rec.ini.toISOString() : null,
+           so: [...rec.strong], si: [...(rec.strongItens || [])], cats: [...rec.cats], itens: rec.itens || null,
+           valor: d.valorTotalEstimado || rec.it.valor_global || (snaps[rec.id] && snaps[rec.id].valor) || null,
+           origem: d.linkSistemaOrigem || (snaps[rec.id] && snaps[rec.id].origem) || null, it };
+}
+function deSnap(s){
+  return { id: s.id, it: s.it || {}, km: s.km, fim: s.fim ? new Date(s.fim) : null, ini: s.ini ? new Date(s.ini) : null,
+           n: norm(((s.it||{}).title||"") + " " + ((s.it||{}).description||"")), cats: new Set(s.cats || []), strong: new Set(s.so || []),
+           strongItens: new Set(s.si || []), itens: s.itens, _snap: true, _valor: s.valor, _origem: s.origem };
+}
+const recById = id => items.get(id) || (snaps[id] ? deSnap(snaps[id]) : null);
+function salvaLocal(){ store.set("marks", marks); store.set("motivos", motivos); store.set("snaps", snaps); store.set("pendentes", [...pendentes]); }
+
+function atualizaSync(){
+  const el = $("#sync");
+  if(!API){ el.textContent = "Arquivo local: marcações só neste navegador"; el.className = "sync"; return; }
+  el.textContent = apiOk ? (pendentes.size ? "Sincronizando marcações…" : "✓ Marcações sincronizadas") : "Marcações salvas só neste aparelho (sem conexão com o banco)";
+  el.className = "sync" + (apiOk && !pendentes.size ? " ok" : "");
+}
+async function enviar(id){
+  if(!API || !apiOk){ pendentes.add(id); salvaLocal(); atualizaSync(); return; }
+  try{
+    let r;
+    if(marks[id]){
+      const mo = motivos[id] || {};
+      const fr = [...conf(recById(id) || {strong:new Set(), strongItens:null})].map(nomeCat).join(", ");
+      r = await fetch(API + "/" + encodeURIComponent(id), { method:"PUT", headers:{"content-type":"application/json"},
+        body: JSON.stringify({ acao: marks[id], motivo: mo.m || null, obs: mo.obs || null, frentes: fr, snap: snaps[id] || null }) });
+    } else {
+      r = await fetch(API + "/" + encodeURIComponent(id), { method:"DELETE" });
+    }
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    pendentes.delete(id); if(marks[id]) servidorIds.add(id); else servidorIds.delete(id);
+  }catch(e){ apiOk = false; pendentes.add(id); }
+  salvaLocal(); atualizaSync();
+}
+async function carregarServidor(){
+  if(!API){ atualizaSync(); return; }
+  try{
+    const r = await fetch(API, { cache:"no-store" });
+    if(!r.ok || !(r.headers.get("content-type")||"").includes("json")) throw new Error("sem API");
+    const j = await r.json();
+    const localMarks = { ...marks }, localMot = { ...motivos };
+    apiOk = true; servidorIds = new Set(); marks = {}; motivos = {};
+    for(const m of j.marcas || []){
+      servidorIds.add(m.id); marks[m.id] = m.acao;
+      if(m.motivo || m.obs) motivos[m.id] = { m: m.motivo, obs: m.obs };
+      if(m.snap) snaps[m.id] = m.snap;
+    }
+    // primeira vez: sobe as marcações antigas deste aparelho; depois, só o que mudou sem conexão
+    const subir = new Set(pendentes);
+    if(!store.get("migrado", false)) Object.keys(localMarks).forEach(id => { if(!servidorIds.has(id)) subir.add(id); });
+    for(const id of subir){
+      if(localMarks[id]){ marks[id] = localMarks[id]; if(localMot[id]) motivos[id] = localMot[id]; } else delete marks[id];
+    }
+    for(const id of Object.keys(snaps)) if(!marks[id]) delete snaps[id];
+    salvaLocal(); store.set("migrado", true);
+    atualizaSync();
+    for(const id of subir) await enviar(id);
+  }catch(e){ apiOk = false; atualizaSync(); }
+}
 
 // ---- tema
 function applyTheme(t){ if(t) document.documentElement.setAttribute("data-theme", t); else document.documentElement.removeAttribute("data-theme"); }
@@ -346,12 +450,14 @@ function catsAtivas(){
 }
 
 // ---- estado
-let items = new Map();   // id -> registro
+let items = new Map();   // id -> registro da busca atual
 let details = new Map(); // id -> detalhe da API de consulta
 let running = false;
+let aba = "abertos";
+let abrirMotivo = null;   // id do card com o painel de motivo aberto
 
 function setStatus(t){ $("#status").textContent = t; }
-function toast(t){ const el=$("#toast"); el.textContent=t; el.classList.add("on"); setTimeout(()=>el.classList.remove("on"), 1800); }
+function toast(t){ const el=$("#toast"); el.textContent=t; el.classList.add("on"); setTimeout(()=>el.classList.remove("on"), 2000); }
 function horaAgora(){ return new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}); }
 
 async function pool(tasks, n, onTick){
@@ -413,19 +519,25 @@ async function buscar(){
   window.__falhasBusca = falhas;
   atualizaSnaps();
   preencheUFs();
+  treinar();
   render();
   store.set("seen", Array.from(new Set([...prevSeen, ...items.keys()])).slice(-3000));
   await verificarItens();
 }
 
-// cópias dos marcados com interesse: renova com os dados atuais quando o edital ainda está na busca
+// cópias dos editais marcados: renova com os dados atuais; marcação antiga sem cópia ganha uma e sobe para o banco
 function atualizaSnaps(){
-  for(const [id, m] of Object.entries(marks)) if(m === "interesse" && items.has(id)) snaps[id] = snapshot(items.get(id));
-  for(const id of Object.keys(snaps)) if(marks[id] !== "interesse") delete snaps[id];
-  store.set("snaps", snaps);
+  const subir = [];
+  for(const [id, m] of Object.entries(marks)){
+    if(!m || !items.has(id)) continue;
+    const tinha = !!snaps[id];
+    snaps[id] = snapshot(items.get(id));
+    if(!tinha) subir.push(id);
+  }
+  for(const id of Object.keys(snaps)) if(!marks[id]) delete snaps[id];
+  salvaLocal();
+  subir.forEach(id => enviar(id));
 }
-const recInteresse = id => items.get(id) || (snaps[id] ? deSnap(snaps[id]) : null);
-const idsInteresse = () => Object.keys(marks).filter(id => marks[id] === "interesse" && recInteresse(id));
 
 // ---- conferência dos itens de cada edital
 function aplicaItens(rec, m){ rec.itens = m; rec.strongItens = new Set(Object.keys(m).filter(c => !rec.strong.has(c))); }
@@ -434,7 +546,7 @@ async function verificarItens(){
   if(verifRodando){ verifPendente = true; return; }
   verifRodando = true;
   const f0 = filtros();
-  const cand = [...items.values()].filter(r => !r.itens && passaUF(r, f0) && !elegiveis(r, f0).length
+  const cand = [...items.values()].filter(r => !r.itens && marks[r.id] !== "descartado" && passaUF(r, f0) && !elegiveis(r, f0).length
       && [...r.cats].some(c => c !== "sup" && f0.ativas.has(c) && dentro(r, c, f0)));
   if(cand.length){
     let mudou = 0;
@@ -462,11 +574,57 @@ async function verificarItens(){
     store.set("itens", itensCache);
   }
   atualizaSnaps();
+  treinar();
   const f = window.__falhasBusca || 0;
   setStatus(f ? "Atualizado com " + f + " falha(s) na busca — tente de novo." : "Atualizado às " + horaAgora());
   render();
   verifRodando = false;
   if(verifPendente){ verifPendente = false; verificarItens(); }
+}
+
+// ---- aprendizado: palavras do objeto/itens dos marcados como interesse x descartados
+const STOP = new Set(("para pela pelo pelos pelas com sem dos das nos nas por que uma uns umas este esta esse essa isso como mais menos entre sobre conforme demais " +
+  "diversos diversas atender atendimento necessidades necessidade secretaria secretarias municipal municipais municipio prefeitura camara estado estadual " +
+  "contratacao contratar empresa empresas especializada especializado especializadas prestacao servico servicos fornecimento aquisicao aquisicoes " +
+  "registro precos preco futura futuras futuro eventual eventuais objeto presente licitacao pregao eletronico edital forma modalidade item itens lote lotes " +
+  "unidade unidades periodo meses anos visando destinados destinadas destinado destinada conforme termo referencia anexo durante tipo").split(" "));
+function tokens(texto){ return [...new Set(norm(texto).replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).filter(w => w.length >= 4 && !STOP.has(w) && !/^\d+$/.test(w)))]; }
+function textoRec(rec){ const its = rec.itens ? Object.values(rec.itens).flat().map(x => x[1]).join(" ") : ""; return (rec.it.description || rec.it.title || "") + " " + its; }
+function valorRec(rec){ const d = details.get(rec.id) || {}; return d.valorTotalEstimado || rec.it.valor_global || rec._valor || (snaps[rec.id] && snaps[rec.id].valor) || 0; }
+let modelo = { pronto:false, nI:0, nD:0 };
+function treinar(){
+  const I = [], D = [];
+  for(const [id, a] of Object.entries(marks)){
+    const rec = recById(id); if(!rec) continue;
+    (a === "interesse" ? I : D).push({ rec, t: tokens(textoRec(rec)) });
+  }
+  // descarte por distância, valor, prazo, exigência ou duplicidade não diz nada sobre o assunto do edital:
+  // esses entram como regra (km/valor) e ficam fora do aprendizado por palavras
+  const NAO_ASSUNTO = new Set(["longe", "valor", "prazo", "exigencia", "duplicado"]);
+  const DW = D.filter(d => !NAO_ASSUNTO.has((motivos[d.rec.id]||{}).m));
+  const cI = new Map(), cD = new Map();
+  I.forEach(d => d.t.forEach(w => cI.set(w, (cI.get(w)||0) + 1)));
+  DW.forEach(d => d.t.forEach(w => cD.set(w, (cD.get(w)||0) + 1)));
+  const peso = new Map();
+  for(const w of new Set([...cI.keys(), ...cD.keys()])){
+    const pI = ((cI.get(w)||0) + 1) / (I.length + 2), pD = ((cD.get(w)||0) + 1) / (DW.length + 2);
+    peso.set(w, Math.log(pI / pD));
+  }
+  const longe = D.filter(d => (motivos[d.rec.id]||{}).m === "longe").map(d => d.rec.km).filter(k => k != null);
+  const baixos = D.filter(d => (motivos[d.rec.id]||{}).m === "valor").map(d => valorRec(d.rec)).filter(v => v > 0);
+  const contMot = {}; D.forEach(d => { const m = (motivos[d.rec.id]||{}).m || "sem"; contMot[m] = (contMot[m]||0) + 1; });
+  modelo = { pronto: I.length >= 2 && D.length >= 3, nI: I.length, nD: D.length, peso, cI, cD,
+             prior: Math.log((I.length + 1) / (DW.length + 1)),
+             kmLonge: longe.length ? Math.min(...longe) : null, valorBaixo: baixos.length ? Math.max(...baixos) : null, contMot };
+}
+function pontua(rec){
+  if(!modelo.pronto) return null;
+  let s = modelo.prior;
+  for(const w of tokens(textoRec(rec))){ const p = modelo.peso.get(w); if(p) s += p; }
+  if(modelo.kmLonge != null && rec.km >= modelo.kmLonge) s -= 1.5;
+  const v = valorRec(rec); if(modelo.valorBaixo != null && v > 0 && v <= modelo.valorBaixo) s -= 1.5;
+  s = Math.max(-8, Math.min(8, s));
+  return 1 / (1 + Math.exp(-s));
 }
 
 function filtros(){
@@ -476,53 +634,64 @@ function filtros(){
     alcance: +$("#alcance").value,
     uf: $("#uf").value,
     ordem: $("#ordem").value,
-    soInt: $("#soInt").checked,
     fracos: $("#fracos").checked,
-    ocultarDesc: $("#ocultarDesc").checked,
     soLD: $("#soLD").checked,
+    ocultarProv: $("#ocultarProv").checked,
     q: norm($("#busca").value.trim())
   };
 }
-const isLD = rec => /licitar digital/i.test(rec.it.usuario_nome || "") || /licitardigital/i.test((details.get(rec.id)||{}).linkSistemaOrigem || "");
+const isLD = rec => /licitar digital/i.test(rec.it.usuario_nome || "") || /licitardigital/i.test(((details.get(rec.id)||{}).linkSistemaOrigem) || rec._origem || "");
 function diasAte(d){ if(!d) return null; return Math.ceil((d.getTime() - Date.now())/86400000); }
 // suporte respeita o raio do suporte; as demais frentes, o alcance escolhido
 const dentro = (rec, c, f) => rec.km <= (c === "sup" ? f.supRaio : f.alcance);
 const passaUF = (rec, f) => !f.uf || rec.it.uf === f.uf;
 const elegiveis = (rec, f) => [...conf(rec)].filter(c => f.ativas.has(c) && dentro(rec, c, f));
+function passaTexto(rec, q){ if(!q) return true; return (rec.n + " " + norm(rec.it.orgao_nome) + " " + norm(rec.it.municipio_nome) + " " + norm(rec.it.unidade_nome)).includes(q); }
 function preencheUFs(){
   const sel = $("#uf"); const cur = sel.value || ((store.get("filtros", {}) || {}).uf || "");
   const ufs = [...new Set([...items.values()].map(r => r.it.uf).filter(Boolean))].sort();
   sel.innerHTML = '<option value="">Todas as UFs</option>' + ufs.map(u => '<option' + (u === cur ? ' selected' : '') + '>' + esc(u) + '</option>').join("");
 }
+const prazoDe = r => r.fim ? r.fim.getTime() : 9e15;
 
-function visiveis(){
-  const f = filtros();
+function listaAbertos(f){
   const out = [];
-  const prazo0 = r => r.fim ? r.fim.getTime() : 9e15;
-  if(f.soInt){
-    // só os marcados com interesse, sem filtro de frente, raio ou UF
-    for(const id of idsInteresse()){
-      const rec = recInteresse(id);
-      if(f.q){ const hay = rec.n + " " + norm(rec.it.orgao_nome) + " " + norm(rec.it.municipio_nome) + " " + norm(rec.it.unidade_nome); if(!hay.includes(f.q)) continue; }
-      out.push({ rec, forte: true, confirmadas: [...conf(rec)] });
-    }
-    out.sort((a,b) => prazo0(a.rec) - prazo0(b.rec));
-    return out;
-  }
   for(const rec of items.values()){
+    if(marks[rec.id] === "descartado") continue;
     if(!passaUF(rec, f)) continue;
     const confirmadas = elegiveis(rec, f);
     const forte = confirmadas.length > 0;
     const fraco = !forte && [...rec.cats].some(c => f.ativas.has(c) && dentro(rec, c, f));
     if(!forte && !(fraco && f.fracos)) continue;
-    if(f.ocultarDesc && marks[rec.id] === "descartado") continue;
     if(f.soLD && !isLD(rec)) continue;
-    if(f.q){ const hay = rec.n + " " + norm(rec.it.orgao_nome) + " " + norm(rec.it.municipio_nome) + " " + norm(rec.it.unidade_nome); if(!hay.includes(f.q)) continue; }
-    out.push({ rec, forte, confirmadas });
+    if(!passaTexto(rec, f.q)) continue;
+    const p = marks[rec.id] ? null : pontua(rec);
+    if(f.ocultarProv && p != null && p < 0.3) continue;
+    out.push({ rec, forte, confirmadas, p });
   }
-  const prazo = r => r.fim ? r.fim.getTime() : 9e15;
-  out.sort(f.ordem === "km" ? (a,b) => (a.rec.km - b.rec.km) || (prazo(a.rec) - prazo(b.rec)) : (a,b) => prazo(a.rec) - prazo(b.rec));
+  if(f.ordem === "km") out.sort((a,b) => (a.rec.km - b.rec.km) || (prazoDe(a.rec) - prazoDe(b.rec)));
+  else if(f.ordem === "relevancia") out.sort((a,b) => ((b.p == null ? 0.5 : b.p) - (a.p == null ? 0.5 : a.p)) || (prazoDe(a.rec) - prazoDe(b.rec)));
+  else out.sort((a,b) => prazoDe(a.rec) - prazoDe(b.rec));
   return out;
+}
+function listaMarcadas(acao, f){
+  const out = [];
+  for(const [id, m] of Object.entries(marks)){
+    if(m !== acao) continue;
+    const rec = recById(id); if(!rec) continue;
+    if(!passaTexto(rec, f.q)) continue;
+    out.push({ rec, forte: true, confirmadas: [...conf(rec)], p: null });
+  }
+  out.sort((a,b) => prazoDe(a.rec) - prazoDe(b.rec));
+  return out;
+}
+const idsCom = acao => Object.keys(marks).filter(id => marks[id] === acao && recById(id));
+function visiveis(){
+  const f = filtros();
+  if(aba === "interesse") return listaMarcadas("interesse", f);
+  if(aba === "descartados") return listaMarcadas("descartado", f);
+  if(aba === "aprendizado") return [];
+  return listaAbertos(f);
 }
 
 function fmtData(d){ return d ? d.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"}) + " " + d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}) : "—"; }
@@ -537,58 +706,111 @@ function itensDe(rec, cats){
 }
 function itemTxt(x){ const v = fmtValor(x[4]); return "Item " + x[0] + " · " + x[1] + (x[2] ? " · " + x[2] + " " + (x[3]||"") : "") + (v ? " · " + v : ""); }
 
+function painelMotivo(id){
+  return '<div class="motivos" data-id="' + esc(id) + '">' +
+    '<div class="q">Por que descartar?</div>' +
+    '<div class="opts">' + MOTIVOS.map(m => '<button class="mot" type="button" data-motivo="' + m[0] + '">' + esc(m[1]) + '</button>').join("") + '</div>' +
+    '<div class="obs"><input type="text" class="obs-in" maxlength="300" placeholder="Observação (opcional): ex. exige atestado de 500 usuários">' +
+    '<button class="mark" type="button" data-act="cancelar">Cancelar</button></div></div>';
+}
+
 function card(v){
-  const { rec, forte, confirmadas } = v; const it = rec.it; const d = details.get(rec.id) || {};
+  const { rec, forte, confirmadas, p } = v; const it = rec.it; const d = details.get(rec.id) || {};
   const dias = diasAte(rec.fim);
-  const cls = ["ed"]; if(!forte) cls.push("weak"); if(marks[rec.id]==="descartado") cls.push("disc");
-  if(dias !== null && dias <= 3) cls.push("urg"); else if(dias !== null && dias <= 7) cls.push("soon");
+  const marca = marks[rec.id] || "";
+  const encerrado = rec.fim && rec.fim.getTime() < Date.now();
+  const cls = ["ed"]; if(!forte) cls.push("weak"); if(marca === "descartado") cls.push("disc");
+  else if(!encerrado && dias !== null && dias <= 3) cls.push("urg"); else if(!encerrado && dias !== null && dias <= 7) cls.push("soon");
   const pills = [];
-  if(!firstVisit && !prevSeen.has(rec.id)) pills.push('<span class="pill new">novo</span>');
+  if(!marca && !firstVisit && !prevSeen.has(rec.id) && !rec._snap) pills.push('<span class="pill new">novo</span>');
   for(const c of confirmadas) pills.push('<span class="pill">' + esc(nomeCat(c)) + (rec.strong.has(c) ? "" : ' <small>· nos itens</small>') + '</span>');
   if(!forte){ const ff = filtros(); for(const c of rec.cats) if(ff.ativas.has(c) && dentro(rec, c, ff)) pills.push('<span class="pill ghost">possível · ' + esc(nomeCat(c)) + '</span>'); }
   if(isLD(rec)) pills.push('<span class="pill lime">Licitar Digital</span>');
-  const encerrado = rec.fim && rec.fim.getTime() < Date.now();
+  if(p != null && p < 0.3) pills.push('<span class="pill warn">parece descarte</span>');
+  else if(p != null && p > 0.7) pills.push('<span class="pill ok">parece interesse</span>');
   if(rec._snap) pills.push('<span class="pill ghost">' + (encerrado ? "encerrado" : "fora da busca atual") + '</span>');
   const diasTxt = dias === null ? "" : (encerrado ? "encerrado" : (dias <= 0 ? "fecha hoje" : (dias === 1 ? "fecha amanhã" : "fecha em "+dias+" dias")));
-  const valor = fmtValor(d.valorTotalEstimado) || fmtValor(it.valor_global);
-  const origem = d.linkSistemaOrigem ? '<a href="'+esc(d.linkSistemaOrigem)+'" target="_blank" rel="noopener">Sistema de origem ↗</a>' : "";
-  const m = marks[rec.id] || "";
+  const valor = fmtValor(d.valorTotalEstimado) || fmtValor(it.valor_global) || fmtValor(rec._valor);
+  const linkOrigem = d.linkSistemaOrigem || rec._origem;
+  const origem = linkOrigem ? '<a href="'+esc(linkOrigem)+'" target="_blank" rel="noopener">Sistema de origem ↗</a>' : "";
   const obj = (it.description || it.title || "").replace(/^\[[^\]]+\]\s*-\s*/,"");
   const its = itensDe(rec, confirmadas);
   const itensHtml = its.length ? '<div class="itens">' + its.slice(0,4).map(x => '<div><b>Item ' + esc(x[0]) + '</b> · ' + esc(x[1]) + (x[2] ? ' · ' + esc(x[2]) + ' ' + esc(x[3]||"") : '') + (fmtValor(x[4]) ? ' · ' + esc(fmtValor(x[4])) : '') + '</div>').join("") + (its.length > 4 ? '<div>+ ' + (its.length-4) + ' item(ns)</div>' : '') + '</div>' : "";
+  const mo = motivos[rec.id];
+  const motivoHtml = marca === "descartado" ? '<div class="motivo-lido">✕ ' + esc(nomeMotivo(mo && mo.m)) + (mo && mo.obs ? ' — ' + esc(mo.obs) : '') + '</div>' : "";
+  const botoes = marca === "descartado"
+    ? '<button class="mark" type="button" data-act="restaurar">↩ Restaurar</button>'
+    : '<button class="mark int" type="button" data-act="interesse" aria-pressed="'+(marca==="interesse")+'">★ Interesse</button>' +
+      '<button class="mark dis" type="button" data-act="descartar">✕ Descartar</button>';
   return '<article class="'+cls.join(" ")+'" data-id="'+esc(rec.id)+'">'+
     '<div class="top">'+pills.join("")+'<span class="days">'+esc(diasTxt)+'</span></div>'+
     '<h3>'+esc(it.orgao_nome || "")+'</h3>'+
-    '<div class="meta">'+esc(it.municipio_nome)+'/'+esc(it.uf)+' · <span class="mono">'+rec.km.toLocaleString("pt-BR")+' km</span> · '+esc(it.modalidade_licitacao_nome||"")+' · encerra <span class="mono">'+esc(fmtData(rec.fim))+'</span>'+(it.unidade_nome && it.unidade_nome!==it.orgao_nome ? ' · '+esc(it.unidade_nome) : '')+'</div>'+
-    '<p class="obj">'+esc(obj)+'</p>'+ itensHtml +
+    '<div class="meta">'+esc(it.municipio_nome)+'/'+esc(it.uf)+' · <span class="mono">'+(rec.km != null ? rec.km.toLocaleString("pt-BR") : "?")+' km</span> · '+esc(it.modalidade_licitacao_nome||"")+' · encerra <span class="mono">'+esc(fmtData(rec.fim))+'</span>'+(it.unidade_nome && it.unidade_nome!==it.orgao_nome ? ' · '+esc(it.unidade_nome) : '')+'</div>'+
+    '<p class="obj">'+esc(obj)+'</p>'+ itensHtml + motivoHtml +
     '<div class="foot">'+
       (valor ? '<span class="val">'+esc(valor)+'</span>' : '<span class="meta">valor não informado</span>')+
       '<span class="meta">'+esc(plataforma(rec))+'</span>'+
       '<a href="'+esc(linkPncp(rec))+'" target="_blank" rel="noopener">Edital no PNCP ↗</a>'+origem+
-      '<span class="sp"></span>'+
-      '<button class="mark int" type="button" data-act="interesse" aria-pressed="'+(m==="interesse")+'">★ Interesse</button>'+
-      '<button class="mark dis" type="button" data-act="descartado" aria-pressed="'+(m==="descartado")+'">✕ Descartar</button>'+
-    '</div></article>';
+      '<span class="sp"></span>'+ botoes +
+    '</div>' + (abrirMotivo === rec.id ? painelMotivo(rec.id) : '') + '</article>';
+}
+
+function painelAprendizado(){
+  const m = modelo;
+  const nI = idsCom("interesse").length, nD = idsCom("descartado").length;
+  let h = '<div class="learn">';
+  h += '<div class="card"><h3>Onde estou</h3><p>' + nI + ' marcado(s) com interesse e ' + nD + ' descartado(s).</p>' +
+       (m.pronto ? '<p>Já estou pontuando os editais abertos: os parecidos com seus interesses ganham o selo <span class="pill ok">parece interesse</span> e os parecidos com seus descartes, <span class="pill warn">parece descarte</span>. Use "Ordenar pelo que aprendi" ou "Ocultar prováveis descartes".</p>'
+                 : '<p>Marque pelo menos 2 interesses e 3 descartes para eu começar a pontuar os editais abertos.</p>') +
+       '<p>Tudo fica no banco do monitor, com o histórico de cada decisão. Quando você pedir ao Claude para revisar, ele lê esse histórico e ajusta os termos e filtros da busca.</p></div>';
+  const mot = Object.entries(m.contMot || {}).sort((a,b) => b[1] - a[1]);
+  h += '<div class="grid2"><div class="card"><h3>Motivos de descarte</h3>' + (mot.length
+       ? '<table>' + mot.map(([k, n]) => '<tr><td>' + esc(k === "sem" ? "Sem motivo (marcação antiga)" : nomeMotivo(k)) + '</td><td class="n">' + n + '</td></tr>').join("") + '</table>'
+       : '<p>Nenhum descarte ainda.</p>') + '</div>';
+  h += '<div class="card"><h3>Limites que aprendi</h3>' +
+       '<p>' + (m.kmLonge != null ? 'Editais a partir de <b>' + m.kmLonge.toLocaleString("pt-BR") + ' km</b> perdem pontos (descartes por "Longe ou exige presença").' : 'Distância: ainda sem descartes por "Longe ou exige presença".') + '</p>' +
+       '<p>' + (m.valorBaixo != null ? 'Editais de até <b>' + esc(fmtValor(m.valorBaixo)) + '</b> perdem pontos (descartes por "Valor baixo").' : 'Valor: ainda sem descartes por "Valor baixo".') + '</p></div></div>';
+  if(m.peso && m.peso.size){
+    const lista = [...m.peso.entries()].filter(([w]) => ((m.cI.get(w)||0) + (m.cD.get(w)||0)) >= 2);
+    const pro = lista.filter(e => e[1] > 0.3).sort((a,b) => b[1] - a[1]).slice(0, 15);
+    const contra = lista.filter(e => e[1] < -0.3).sort((a,b) => a[1] - b[1]).slice(0, 15);
+    h += '<div class="grid2"><div class="card"><h3>Palavras que puxam para interesse</h3><div class="words">' +
+         (pro.length ? pro.map(([w]) => '<span class="pill ok">' + esc(w) + '</span>').join("") : '<p>Ainda poucas marcações.</p>') + '</div></div>' +
+         '<div class="card"><h3>Palavras que puxam para descarte</h3><div class="words">' +
+         (contra.length ? contra.map(([w]) => '<span class="pill warn">' + esc(w) + '</span>').join("") : '<p>Ainda poucas marcações.</p>') + '</div></div></div>';
+  }
+  return h + '</div>';
 }
 
 function render(){
-  const vis = visiveis();
   const f = filtros();
-  const noRaio = [...items.values()].filter(r => passaUF(r, f) && elegiveis(r, f).length && marks[r.id] !== "descartado");
+  const abertos = listaAbertos(f);
+  const noRaio = abertos.filter(v => v.forte);
   const tem = (r, pred) => elegiveis(r, f).some(pred);
   $("#nTotal").textContent = noRaio.length;
-  $("#n7").textContent = noRaio.filter(r => { const d = diasAte(r.fim); return d !== null && d <= 7; }).length;
-  $("#nSeg").textContent = noRaio.filter(r => tem(r, c => CATS[c].grupo === "sophos")).length;
-  $("#nBackup").textContent = noRaio.filter(r => tem(r, c => c === "backup")).length;
-  $("#nM365").textContent = noRaio.filter(r => tem(r, c => c === "m365")).length;
-  $("#nSup").textContent = noRaio.filter(r => tem(r, c => c === "sup")).length;
-  $("#nLD").textContent = noRaio.filter(isLD).length;
-  const nInt = idsInteresse().length;
-  $("#nInt").textContent = nInt; $("#cInt").textContent = nInt;
+  $("#n7").textContent = noRaio.filter(v => { const d = diasAte(v.rec.fim); return d !== null && d <= 7; }).length;
+  $("#nSeg").textContent = noRaio.filter(v => tem(v.rec, c => CATS[c].grupo === "sophos")).length;
+  $("#nBackup").textContent = noRaio.filter(v => tem(v.rec, c => c === "backup")).length;
+  $("#nM365").textContent = noRaio.filter(v => tem(v.rec, c => c === "m365")).length;
+  $("#nSup").textContent = noRaio.filter(v => tem(v.rec, c => c === "sup")).length;
+  $("#nLD").textContent = noRaio.filter(v => isLD(v.rec)).length;
+  const nInt = idsCom("interesse").length, nDesc = idsCom("descartado").length;
+  $("#nInt").textContent = nInt;
+  $("#tAb").textContent = abertos.length; $("#tInt").textContent = nInt; $("#tDesc").textContent = nDesc;
+  document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", t.dataset.aba === aba));
+  if(aba === "aprendizado"){
+    $("#countLbl").textContent = "";
+    $("#lista").innerHTML = painelAprendizado();
+    return;
+  }
+  const vis = aba === "abertos" ? abertos : visiveis();
   const fortes = vis.filter(v => v.forte).length;
-  $("#countLbl").textContent = vis.length + " na lista" + (vis.length !== fortes ? " · " + fortes + " confirmados" : "");
-  $("#lista").innerHTML = vis.length ? vis.map(card).join("") : '<div class="empty">Nenhum edital aberto com esses filtros. Amplie o raio ou o alcance, ligue mais linhas ou marque "Mostrar possíveis".</div>';
-  carregarDetalhes(vis.map(v => v.rec));
+  $("#countLbl").textContent = vis.length + (aba === "abertos" ? " na lista" + (vis.length !== fortes ? " · " + fortes + " confirmados" : "") : (aba === "interesse" ? " com interesse" : " descartados"));
+  const vazio = aba === "interesse" ? "Nenhum edital marcado com ★ Interesse ainda."
+              : aba === "descartados" ? "Nenhum edital descartado ainda."
+              : "Nenhum edital aberto com esses filtros. Amplie o raio ou o alcance, ligue mais linhas ou marque \"Mostrar possíveis\".";
+  $("#lista").innerHTML = vis.length ? vis.map(card).join("") : '<div class="empty">' + vazio + '</div>';
+  carregarDetalhes(vis.slice(0, 120).map(v => v.rec).filter(r => !r._snap));
 }
 
 let detRun = 0;
@@ -605,7 +827,49 @@ async function carregarDetalhes(recs){
   if(myRun === detRun) render();
 }
 
+// ---- marcações
+function marcar(id, acao, motivo, obs){
+  const rec = recById(id);
+  if(acao){
+    marks[id] = acao;
+    if(acao === "descartado") motivos[id] = { m: motivo || null, obs: obs || null }; else delete motivos[id];
+    if(rec) snaps[id] = rec._snap ? (snaps[id] || snapshot(rec)) : snapshot(rec);
+  } else {
+    // restaurar: reaproveita os itens já conferidos (ou confere agora) para o edital voltar aos abertos
+    const vivo = items.get(id);
+    if(vivo && !vivo.itens && snaps[id] && snaps[id].itens) aplicaItens(vivo, snaps[id].itens);
+    delete marks[id]; delete motivos[id]; delete snaps[id];
+    if(vivo && !vivo.itens) setTimeout(() => verificarItens(), 0);
+  }
+  salvaLocal(); treinar(); render(); enviar(id);
+}
+$("#lista").addEventListener("click", e => {
+  const card = e.target.closest(".ed"); if(!card) return;
+  const id = card.dataset.id;
+  const mot = e.target.closest(".mot");
+  if(mot){
+    const obs = (card.querySelector(".obs-in") || {}).value || "";
+    abrirMotivo = null;
+    marcar(id, "descartado", mot.dataset.motivo, obs.trim());
+    toast("Descartado: " + nomeMotivo(mot.dataset.motivo));
+    return;
+  }
+  const b = e.target.closest(".mark"); if(!b) return;
+  const act = b.dataset.act;
+  if(act === "interesse"){ marcar(id, marks[id] === "interesse" ? null : "interesse"); toast(marks[id] ? "★ Marcado com interesse" : "Interesse removido"); }
+  else if(act === "descartar"){ abrirMotivo = abrirMotivo === id ? null : id; render(); const inp = document.querySelector('.ed[data-id="' + CSS.escape(id) + '"] .obs-in'); if(inp) inp.focus({preventScroll:true}); }
+  else if(act === "cancelar"){ abrirMotivo = null; render(); }
+  else if(act === "restaurar"){ marcar(id, null); toast("Restaurado para os abertos"); }
+});
+$("#lista").addEventListener("keydown", e => {
+  if(e.key === "Enter" && e.target.classList.contains("obs-in")){
+    const card = e.target.closest(".ed"); abrirMotivo = null;
+    marcar(card.dataset.id, "descartado", "outro", e.target.value.trim()); toast("Descartado: Outro");
+  }
+});
+
 // ---- eventos
+document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => { aba = t.dataset.aba; abrirMotivo = null; render(); }));
 function salvaChips(){
   store.set("grupos", [...document.querySelectorAll(".chip[data-grupo][aria-pressed=true]")].map(b => b.dataset.grupo));
   store.set("linhas", [...document.querySelectorAll(".chip[data-linha][aria-pressed=true]")].map(b => b.dataset.linha));
@@ -614,26 +878,18 @@ document.querySelectorAll(".chip").forEach(b => b.addEventListener("click", () =
   b.setAttribute("aria-pressed", b.getAttribute("aria-pressed") !== "true"); salvaChips(); render(); if(items.size) verificarItens();
 }));
 ["#raioSup","#alcance","#uf"].forEach(s => $(s).addEventListener("change", () => { salvaFiltros(); render(); if(items.size) verificarItens(); }));
-$("#soInt").addEventListener("change", () => render());
-["#ordem","#fracos","#ocultarDesc","#soLD"].forEach(s => $(s).addEventListener("change", () => { salvaFiltros(); render(); }));
-function salvaFiltros(){ store.set("filtros", { raioSup:$("#raioSup").value, alcance:$("#alcance").value, uf:$("#uf").value, ordem:$("#ordem").value, fracos:$("#fracos").checked, soLD:$("#soLD").checked }); }
+["#ordem","#fracos","#soLD","#ocultarProv"].forEach(s => $(s).addEventListener("change", () => { salvaFiltros(); render(); }));
+function salvaFiltros(){ store.set("filtros", { raioSup:$("#raioSup").value, alcance:$("#alcance").value, uf:$("#uf").value, ordem:$("#ordem").value, fracos:$("#fracos").checked, soLD:$("#soLD").checked, ocultarProv:$("#ocultarProv").checked }); }
 $("#busca").addEventListener("input", () => render());
-$("#btnAtualizar").addEventListener("click", () => { itensCache = {}; store.set("itens", {}); buscar(); });
-$("#lista").addEventListener("click", e => {
-  const b = e.target.closest(".mark"); if(!b) return;
-  const id = b.closest(".ed").dataset.id; const act = b.dataset.act;
-  if(marks[id] === act) delete marks[id]; else marks[id] = act;
-  if(marks[id] === "interesse"){ const rec = items.get(id); if(rec) snaps[id] = snapshot(rec); }
-  else delete snaps[id];
-  store.set("marks", marks); store.set("snaps", snaps); render();
-});
+$("#btnAtualizar").addEventListener("click", () => { itensCache = {}; store.set("itens", {}); carregarServidor().then(buscar); });
 
 function linhas(){
-  return visiveis().map(({rec, forte, confirmadas}) => {
+  return visiveis().map(({rec, forte, confirmadas, p}) => {
     const it = rec.it, d = details.get(rec.id) || {};
     const fa = filtros().ativas;
     const frentes = forte ? confirmadas : [...rec.cats].filter(c => fa.has(c));
     const viaObj = confirmadas.some(c => rec.strong.has(c)), viaIt = confirmadas.some(c => !rec.strong.has(c));
+    const mo = motivos[rec.id] || {};
     return {
       relevancia: forte ? "confirmado" : "possível",
       confirmado_em: forte ? (viaObj && viaIt ? "objeto+itens" : (viaObj ? "objeto" : "itens")) : "anexos",
@@ -642,9 +898,11 @@ function linhas(){
       modalidade: it.modalidade_licitacao_nome || "", objeto: (it.description || "").replace(/\s+/g," "),
       itens_encontrados: itensDe(rec, confirmadas).map(itemTxt).join(" | "),
       abertura: fmtData(rec.ini), encerramento: fmtData(rec.fim), dias: diasAte(rec.fim),
-      valor_estimado: d.valorTotalEstimado || it.valor_global || "", plataforma: plataforma(rec),
+      valor_estimado: d.valorTotalEstimado || it.valor_global || rec._valor || "", plataforma: plataforma(rec),
       processo: d.processo || "", numero_compra: d.numeroCompra || "",
-      link_pncp: linkPncp(rec), link_origem: d.linkSistemaOrigem || "", controle_pncp: rec.id, marcacao: marks[rec.id] || ""
+      link_pncp: linkPncp(rec), link_origem: d.linkSistemaOrigem || rec._origem || "", controle_pncp: rec.id,
+      marcacao: marks[rec.id] || "", motivo: marks[rec.id] === "descartado" ? nomeMotivo(mo.m) : "", obs: mo.obs || "",
+      pontuacao_aprendida: p == null ? "" : Math.round(p * 100) + "%"
     };
   });
 }
@@ -655,14 +913,16 @@ $("#btnCsv").addEventListener("click", () => {
   const csv = "﻿" + cols.join(";") + "\n" + rows.map(r => cols.map(c => cell(r[c])).join(";")).join("\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csv], {type:"text/csv;charset=utf-8"}));
-  a.download = "editais-nano-" + new Date().toISOString().slice(0,10) + ".csv";
+  a.download = "editais-nano-" + aba + "-" + new Date().toISOString().slice(0,10) + ".csv";
   document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
 });
 $("#btnZap").addEventListener("click", async () => {
   const rows = linhas().filter(r => r.relevancia === "confirmado");
   if(!rows.length){ toast("Nenhum edital confirmado na lista"); return; }
-  const txt = "*Editais abertos · Nano TI* (" + new Date().toLocaleDateString("pt-BR") + ")\n\n" + rows.map(r =>
+  const titulo = aba === "interesse" ? "Editais com interesse" : aba === "descartados" ? "Editais descartados" : "Editais abertos";
+  const txt = "*" + titulo + " · Nano TI* (" + new Date().toLocaleDateString("pt-BR") + ")\n\n" + rows.map(r =>
     "• *" + r.frentes + "* — " + r.orgao + " (" + r.municipio + "/" + r.uf + ", " + r.km + " km)\n  Encerra " + r.encerramento + (r.valor_estimado ? " · " + fmtValor(+r.valor_estimado) : "") + " · " + r.plataforma +
+    (r.motivo ? "\n  Motivo: " + r.motivo + (r.obs ? " — " + r.obs : "") : "") +
     (r.itens_encontrados ? "\n  " + r.itens_encontrados.split(" | ")[0] : "") + "\n  " + r.link_pncp
   ).join("\n\n");
   try{ await navigator.clipboard.writeText(txt); toast("Copiado — cole no WhatsApp"); }
@@ -675,10 +935,12 @@ if(fs){
   if(fs.raioSup) $("#raioSup").value = fs.raioSup;
   if(fs.alcance) $("#alcance").value = fs.alcance;
   if(fs.ordem) $("#ordem").value = fs.ordem;
-  $("#fracos").checked = !!fs.fracos; $("#soLD").checked = !!fs.soLD;
+  $("#fracos").checked = !!fs.fracos; $("#soLD").checked = !!fs.soLD; $("#ocultarProv").checked = !!fs.ocultarProv;
 }
 catsAtivas();
+atualizaSync();
 
+carregarServidor().then(() => { treinar(); render(); });
 buscar().catch(e => { running=false; $("#btnAtualizar").disabled=false; setStatus("Falha ao consultar o PNCP: " + e.message); $("#lista").innerHTML = '<div class="empty">Não consegui falar com o PNCP. Confira a internet e clique em Atualizar.</div>'; });
 })();
 </script>

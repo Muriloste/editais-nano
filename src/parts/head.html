@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monitor de Editais · Nano TI</title>
+<meta name="theme-color" content="#150C3D">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Editais Nano">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23150C3D'/%3E%3Ctext x='32' y='44' font-family='Arial' font-weight='700' font-size='36' text-anchor='middle' fill='%23C6FA1E'%3EN%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F4F5FA; --surface:#FFFFFF; --surface-2:#ECEEF7; --border:#DCDFEE;
+  --text:#211F3D; --text-soft:#5B5E76; --text-faint:#8689A3;
+  --accent-blue:#284B8C; --accent-blue-soft:#E7ECF7;
+  --accent-lime:#A9CC12; --accent-lime-soft:#EEF6C9;
+  --marker-ink:#150C3D; --track-b-text:#5C6E05; --rule-mark:#6E8500;
+  --call-bg:#241660; --call-text:#F2F1FF;
+  --warn:#B4232C; --warn-soft:#FBE7E8; --amber:#9A5B00; --amber-soft:#FCF0DC;
+  --on-accent:#FFFFFF;
+  --shadow:0 1px 2px rgba(21,12,61,0.06), 0 8px 24px -12px rgba(21,12,61,0.18);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#120B33; --surface:#1B1348; --surface-2:#241A5C; --border:#362B70;
+    --text:#ECEDF7; --text-soft:#B4B6D6; --text-faint:#8A8CB3;
+    --accent-blue:#7C9BE0; --accent-blue-soft:#253566;
+    --accent-lime:#C6FA1E; --accent-lime-soft:#33401A;
+    --marker-ink:#ECEDF7; --track-b-text:#D8F16B; --rule-mark:#D8F16B;
+    --call-bg:#2E1B7A; --call-text:#F2F1FF;
+    --warn:#FF8A8A; --warn-soft:#4A1A2E; --amber:#FFC266; --amber-soft:#43301A;
+    --on-accent:#120B33;
+    --shadow:0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#120B33; --surface:#1B1348; --surface-2:#241A5C; --border:#362B70;
+  --text:#ECEDF7; --text-soft:#B4B6D6; --text-faint:#8A8CB3;
+  --accent-blue:#7C9BE0; --accent-blue-soft:#253566;
+  --accent-lime:#C6FA1E; --accent-lime-soft:#33401A;
+  --marker-ink:#ECEDF7; --track-b-text:#D8F16B; --rule-mark:#D8F16B;
+  --call-bg:#2E1B7A; --call-text:#F2F1FF;
+  --warn:#FF8A8A; --warn-soft:#4A1A2E; --amber:#FFC266; --amber-soft:#43301A;
+  --on-accent:#120B33;
+  --shadow:0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+}
+*{box-sizing:border-box}
+html,body{margin:0;overflow-x:hidden}
+body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.55;font-size:15px}
+h1,h2,h3{font-family:Poppins,Inter,system-ui,sans-serif;text-wrap:balance;margin:0}
+.mono{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
+a{color:var(--accent-blue)}
+.wrap{max-width:1000px;margin:0 auto;padding:2.5rem 1.5rem 6rem}
+@media (max-width:600px){.wrap{padding:1.25rem .9rem 5rem}}
+
+.verbar{display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;font-size:.8rem;color:var(--text-soft);margin-bottom:1rem}
+.verbar .tag{font-family:"JetBrains Mono",monospace;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:.15rem .6rem;color:var(--rule-mark);font-weight:600}
+.verbar .spacer{flex:1}
+.btn-theme{background:var(--surface);border:1px solid var(--border);color:var(--text-soft);border-radius:999px;padding:.25rem .7rem;font:inherit;font-size:.8rem;cursor:pointer}
+
+.hero{position:relative;overflow:hidden;border-radius:20px;padding:2rem 1.75rem;color:#fff;background:linear-gradient(135deg,#150C3D 0%,#241660 55%,#2E1B7A 100%);box-shadow:var(--shadow)}
+.hero::after{content:"";position:absolute;inset:0;background-image:radial-gradient(circle at 1px 1px,rgba(255,255,255,0.06) 1px,transparent 0);background-size:18px 18px;pointer-events:none}
+.hero>*{position:relative;z-index:1}
+.kicker{font-family:"JetBrains Mono",monospace;color:#C6FA1E;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600}
+.hero h1{font-size:clamp(1.6rem,3.6vw,2.3rem);font-weight:800;margin:.35rem 0 .4rem;line-height:1.15}
+.hero p{margin:0;color:#D9D7F5;max-width:660px}
+.funil{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:.75rem;margin-top:1.5rem}
+.funil div{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.10);border-radius:12px;padding:.7rem .8rem}
+.funil b{display:block;font-family:"JetBrains Mono",monospace;font-variant-numeric:tabular-nums;font-size:1.6rem;line-height:1.1}
+.funil span{font-size:.72rem;color:#C9C6EE;text-transform:uppercase;letter-spacing:.04em}
+.funil .hot b{color:#C6FA1E}
+
+.controls{margin-top:1.25rem;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1rem;box-shadow:var(--shadow);display:grid;gap:.8rem}
+.row{display:flex;flex-wrap:wrap;gap:.45rem;align-items:center}
+.row.off{opacity:.45}
+.lbl{font-family:"JetBrains Mono",monospace;font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-faint);min-width:72px}
+.chip{border:1px solid var(--border);background:var(--surface-2);color:var(--text-soft);border-radius:999px;padding:.32rem .75rem;font:inherit;font-size:.85rem;cursor:pointer;user-select:none}
+.chip.sub{font-size:.76rem;padding:.2rem .6rem}
+.chip[aria-pressed="true"]{background:var(--accent-blue);border-color:var(--accent-blue);color:var(--on-accent)}
+.chip.sub[aria-pressed="true"]{background:var(--accent-blue-soft);color:var(--accent-blue);border-color:var(--accent-blue)}
+select,input[type=search],input[type=text]{font:inherit;font-size:.88rem;color:var(--text);background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:.38rem .6rem}
+input[type=search]{flex:1;min-width:180px}
+label.chk{display:flex;gap:.35rem;align-items:center;font-size:.85rem;color:var(--text-soft);cursor:pointer}
+.btn{font:inherit;font-size:.85rem;font-weight:600;border-radius:10px;padding:.42rem .85rem;cursor:pointer;border:1px solid var(--border);background:var(--surface-2);color:var(--text)}
+.btn.primary{background:var(--accent-blue);border-color:var(--accent-blue);color:var(--on-accent)}
+.btn:disabled{opacity:.55;cursor:default}
+.status{font-size:.82rem;color:var(--text-soft)}
+.sync{font-size:.75rem;color:var(--text-faint)}
+.sync.ok{color:var(--rule-mark)}
+
+.alert{margin-top:1.25rem;background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--accent-lime);border-radius:12px;padding:.85rem 1rem;font-size:.88rem;color:var(--text-soft)}
+.alert b{color:var(--text)}
+.alert ul{margin:.35rem 0 0;padding-left:1.1rem}
+
+.tabs{display:flex;gap:.35rem;flex-wrap:wrap;margin:2rem 0 .9rem;border-bottom:1px solid var(--border)}
+.tab{font:inherit;font-family:Poppins,Inter,sans-serif;font-weight:600;font-size:.92rem;background:transparent;border:0;border-bottom:3px solid transparent;color:var(--text-soft);padding:.45rem .75rem;cursor:pointer;margin-bottom:-1px}
+.tab[aria-selected="true"]{color:var(--text);border-bottom-color:var(--accent-lime)}
+.tab .n{font-family:"JetBrains Mono",monospace;font-size:.78rem;color:var(--text-faint);margin-left:.2rem}
+.count{font-family:"JetBrains Mono",monospace;color:var(--text-faint);font-size:.82rem;margin:-.4rem 0 .75rem}
+
+.list{display:grid;gap:.75rem}
+.ed{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--accent-blue);border-radius:14px;padding:.95rem 1rem;box-shadow:var(--shadow)}
+.ed.urg{border-left-color:var(--warn)}
+.ed.soon{border-left-color:var(--amber)}
+.ed.weak{opacity:.82;border-left-style:dashed}
+.ed.disc{border-left-color:var(--text-faint)}
+.ed .top{display:flex;flex-wrap:wrap;gap:.35rem;align-items:center}
+.pill{font-size:.7rem;font-weight:600;border-radius:999px;padding:.12rem .55rem;background:var(--accent-blue-soft);color:var(--accent-blue);white-space:nowrap}
+.pill small{font-weight:500;opacity:.8}
+.pill.lime{background:var(--accent-lime-soft);color:var(--track-b-text)}
+.pill.ghost{background:transparent;border:1px dashed var(--border);color:var(--text-faint)}
+.pill.new{background:var(--call-bg);color:var(--call-text)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.ok{background:var(--accent-lime-soft);color:var(--track-b-text);border:1px solid var(--accent-lime)}
+.ed .days{margin-left:auto;font-family:"JetBrains Mono",monospace;font-variant-numeric:tabular-nums;font-size:.8rem;color:var(--text-soft);white-space:nowrap}
+.ed h3{font-size:1rem;font-weight:600;margin:.5rem 0 .15rem;line-height:1.3}
+.ed .meta{font-size:.8rem;color:var(--text-faint)}
+.ed .meta .mono{color:var(--text-soft)}
+.ed .obj{margin:.5rem 0 .6rem;font-size:.9rem;color:var(--text);overflow-wrap:anywhere}
+.ed .itens{margin:-.2rem 0 .6rem;background:var(--surface-2);border-radius:8px;padding:.45rem .65rem;font-size:.8rem;color:var(--text-soft);display:grid;gap:.2rem;overflow-wrap:anywhere}
+.ed .itens b{font-family:"JetBrains Mono",monospace;font-variant-numeric:tabular-nums;color:var(--text);font-weight:600}
+.ed .motivo-lido{margin:-.2rem 0 .6rem;font-size:.82rem;color:var(--warn)}
+.ed .foot{display:flex;flex-wrap:wrap;gap:.5rem .9rem;align-items:center;font-size:.82rem}
+.ed .foot .val{font-family:"JetBrains Mono",monospace;font-variant-numeric:tabular-nums;font-weight:600}
+.ed .foot .sp{flex:1}
+.mark{font:inherit;font-size:.78rem;border:1px solid var(--border);background:var(--surface-2);color:var(--text-soft);border-radius:8px;padding:.2rem .55rem;cursor:pointer}
+.mark[aria-pressed="true"].int{background:var(--accent-lime-soft);color:var(--track-b-text);border-color:var(--accent-lime)}
+.motivos{margin-top:.7rem;border-top:1px dashed var(--border);padding-top:.7rem;display:grid;gap:.5rem}
+.motivos .q{font-size:.82rem;font-weight:600;color:var(--text)}
+.motivos .opts{display:flex;flex-wrap:wrap;gap:.35rem}
+.mot{font:inherit;font-size:.78rem;border:1px solid var(--border);background:var(--surface-2);color:var(--text);border-radius:999px;padding:.25rem .65rem;cursor:pointer}
+.mot:hover{border-color:var(--warn);color:var(--warn)}
+.motivos .obs{display:flex;gap:.4rem;flex-wrap:wrap}
+.motivos .obs input{flex:1;min-width:180px}
+.empty{background:var(--surface);border:1px dashed var(--border);border-radius:14px;padding:1.5rem;text-align:center;color:var(--text-soft)}
+
+.learn{display:grid;gap:1rem}
+.learn .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1rem 1.1rem;box-shadow:var(--shadow)}
+.learn h3{font-size:1rem;margin-bottom:.5rem}
+.learn .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem}
+.learn table{width:100%;border-collapse:collapse;font-size:.85rem}
+.learn td{padding:.3rem .2rem;border-bottom:1px solid var(--border)}
+.learn td.n{text-align:right;font-family:"JetBrains Mono",monospace;font-variant-numeric:tabular-nums;width:4rem}
+.learn .words{display:flex;flex-wrap:wrap;gap:.35rem}
+.learn p{margin:.2rem 0;color:var(--text-soft);font-size:.88rem}
+
+.src{margin-top:2.5rem;font-size:.78rem;color:var(--text-faint);border-top:1px solid var(--border);padding-top:1rem}
+.toast{position:fixed;left:50%;bottom:1.25rem;transform:translateX(-50%);background:var(--call-bg);color:var(--call-text);padding:.55rem 1rem;border-radius:10px;font-size:.85rem;box-shadow:var(--shadow);opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:1}
+@media print{.controls,.mark,.btn-theme,.tabs{display:none}.ed,.hero{break-inside:avoid-page}*{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="verbar">
+  <span class="tag">v5 · 08/11/2026</span>
+  <span>Abas de Interesse e Descartados, motivo ao descartar, marcações sincronizadas entre aparelhos e pontuação que aprende com as suas escolhas.</span>
+  <span class="spacer"></span>
+  <button class="btn-theme" id="themeBtn" type="button">Tema</button>
+</div>
+
+<header class="hero">
+  <div class="kicker">PNCP · consulta ao vivo · base Leme/SP</div>
+  <h1>Editais abertos para a Nano</h1>
+  <p>Licitações recebendo proposta agora: Sophos, Acronis e Microsoft no Brasil todo, e suporte de TI só perto de Leme. O objeto e a lista de itens de cada edital são conferidos.</p>
+  <div class="funil">
+    <div><b id="nTotal">–</b><span>Abertos</span></div>
+    <div class="hot"><b id="n7">–</b><span>Fecham em 7 dias</span></div>
+    <div><b id="nSeg">–</b><span>Sophos</span></div>
+    <div><b id="nBackup">–</b><span>Backup</span></div>
+    <div><b id="nM365">–</b><span>Microsoft</span></div>
+    <div><b id="nSup">–</b><span>Suporte TI</span></div>
+    <div><b id="nLD">–</b><span>Licitar Digital</span></div>
+    <div class="hot"><b id="nInt">–</b><span>★ Interesse</span></div>
+  </div>
+</header>
+
+<section class="controls" aria-label="Filtros">
+  <div class="row">
+    <span class="lbl">Frentes</span>
+    <button class="chip" data-grupo="sophos" aria-pressed="true" type="button">Sophos</button>
+    <button class="chip" data-grupo="backup" aria-pressed="true" type="button">Backup · Acronis</button>
+    <button class="chip" data-grupo="m365" aria-pressed="true" type="button">Microsoft · M365</button>
+    <button class="chip" data-grupo="sup" aria-pressed="true" type="button">Suporte de TI</button>
+  </div>
+  <div class="row" id="linhasSophos"><span class="lbl">Linhas Sophos</span></div>
+  <div class="row">
+    <span class="lbl">Suporte</span>
+    <select id="raioSup" aria-label="Raio do suporte de TI a partir de Leme">
+      <option value="100">até 100 km</option>
+      <option value="150" selected>até 150 km</option>
+      <option value="200">até 200 km</option>
+    </select>
+    <span class="lbl">Demais</span>
+    <select id="alcance" aria-label="Alcance de Sophos, backup e Microsoft">
+      <option value="99999" selected>Brasil todo</option>
+      <option value="500">até 500 km</option>
+      <option value="300">até 300 km</option>
+      <option value="150">até 150 km</option>
+    </select>
+    <select id="uf" aria-label="UF"><option value="">Todas as UFs</option></select>
+    <select id="ordem" aria-label="Ordenar">
+      <option value="prazo">Ordenar por prazo</option>
+      <option value="km">Ordenar por distância</option>
+      <option value="relevancia">Ordenar pelo que aprendi</option>
+    </select>
+  </div>
+  <div class="row">
+    <input type="search" id="busca" placeholder="Filtrar por órgão, cidade ou palavra do objeto">
+  </div>
+  <div class="row">
+    <label class="chk"><input type="checkbox" id="fracos"> Mostrar possíveis (termo só nos anexos)</label>
+    <label class="chk"><input type="checkbox" id="soLD"> Só Licitar Digital</label>
+    <label class="chk"><input type="checkbox" id="ocultarProv"> Ocultar prováveis descartes</label>
+  </div>
+  <div class="row">
+    <button class="btn primary" id="btnAtualizar" type="button">Atualizar do PNCP</button>
+    <button class="btn" id="btnCsv" type="button">Exportar CSV</button>
+    <button class="btn" id="btnZap" type="button">Copiar p/ WhatsApp</button>
+    <span class="status" id="status">Carregando…</span>
+    <span class="sync" id="sync"></span>
+  </div>
+</section>
+
+<div class="alert">
+  <b>Como ler:</b> cada card é um edital com proposta aberta. A busca usa termos genéricos (firewall, EDR, XDR, backup em nuvem, licença Microsoft…) porque marca quase nunca aparece no objeto.
+  <ul>
+    <li><b>Confirmado no objeto</b> ou <b>nos itens</b> (o card mostra o item). <b>Possível</b>: o termo só aparece nos anexos; fica oculto por padrão.</li>
+    <li><b>Suporte de TI</b> só até o raio escolhido; <b>Sophos, backup e Microsoft</b> no Brasil todo.</li>
+    <li><b>★ Interesse</b> e <b>✕ Descartar</b> (com motivo) vão para as abas próprias e valem no celular e no computador. Com algumas marcações, o monitor passa a sinalizar o que <b>parece interesse</b> e o que <b>parece descarte</b>; a aba <b>O que aprendi</b> mostra por quê.</li>
+  </ul>
+</div>
+
+<div class="tabs" role="tablist">
+  <button class="tab" role="tab" data-aba="abertos" aria-selected="true" type="button">Abertos<span class="n" id="tAb"></span></button>
+  <button class="tab" role="tab" data-aba="interesse" aria-selected="false" type="button">★ Interesse<span class="n" id="tInt"></span></button>
+  <button class="tab" role="tab" data-aba="descartados" aria-selected="false" type="button">✕ Descartados<span class="n" id="tDesc"></span></button>
+  <button class="tab" role="tab" data-aba="aprendizado" aria-selected="false" type="button">O que aprendi</button>
+</div>
+<div class="count" id="countLbl"></div>
+<div class="list" id="lista"><div class="empty">Consultando o PNCP…</div></div>
+
+<div class="src">
+  Fonte: API de busca do PNCP (pncp.gov.br/api/search, editais com status "recebendo proposta"; suporte restrito a SP e MG), API de itens do PNCP (pncp.gov.br/api/pncp/v1/…/itens) e API de consulta do PNCP para valor estimado e link do sistema de origem. Os dados são consultados toda vez que a página abre ou ao clicar em Atualizar; a conferência de itens fica guardada por 12 horas neste navegador. Distâncias em linha reta a partir das coordenadas IBGE dos municípios.
+  As marcações e motivos ficam no banco do monitor (Cloudflare D1), com histórico de cada decisão; se o banco não responder, ficam neste aparelho e sobem na próxima abertura.
+  <span id="lastRun"></span>
+</div>
+</div>
+<div class="toast" id="toast"></div>
+

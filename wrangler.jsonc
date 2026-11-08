@@ -1,6 +1,16 @@
 {
-  // Worker só com arquivos estáticos: o Cloudflare publica a pasta public/ a cada push na main.
+  // Worker editais-nano: serve public/ e a API de marcações (src/worker.js).
+  // A cada push na main o Cloudflare publica sozinho.
   "name": "editais-nano",
+  "main": "src/worker.js",
   "compatibility_date": "2026-11-07",
-  "assets": { "directory": "./public" }
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+  // Banco das marcações. Sem database_id: o wrangler cria o banco na primeira publicação
+  // e o mantém ligado a este Worker nas próximas.
+  "d1_databases": [
+    { "binding": "DB", "database_name": "editais-nano" }
+  ]
 }
