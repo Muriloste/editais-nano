@@ -1,0 +1,6 @@
+{
+  // Worker só com arquivos estáticos: o Cloudflare publica a pasta public/ a cada push na main.
+  "name": "editais-nano",
+  "compatibility_date": "2026-11-07",
+  "assets": { "directory": "./public" }
+}

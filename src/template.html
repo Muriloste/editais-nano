@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monitor de Editais · Nano TI</title>
+<meta name="theme-color" content="#150C3D">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Editais Nano">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23150C3D'/%3E%3Ctext x='32' y='44' font-family='Arial' font-weight='700' font-size='36' text-anchor='middle' fill='%23C6FA1E'%3EN%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F4F5FA; --surface:#FFFFFF; --surface-2:#ECEEF7; --border:#DCDFEE;
+  --text:#211F3D; --text-soft:#5B5E76; --text-faint:#8689A3;
+  --accent-blue:#284B8C; --accent-blue-soft:#E7ECF7;
+  --accent-lime:#A9CC12; --accent-lime-soft:#EEF6C9;
+  --marker-ink:#150C3D; --track-b-text:#5C6E05; --rule-mark:#6E8500;
+  --call-bg:#241660; --call-text:#F2F1FF;
+  --warn:#B4232C; --warn-soft:#FBE7E8; --amber:#9A5B00; --amber-soft:#FCF0DC;
+  --on-accent:#FFFFFF;
+  --shadow:0 1px 2px rgba(21,12,61,0.06), 0 8px 24px -12px rgba(21,12,61,0.18);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#120B33; --surface:#1B1348; --surface-2:#241A5C; --border:#362B70;
+    --text:#ECEDF7; --text-soft:#B4B6D6; --text-faint:#8A8CB3;
+    --accent-blue:#7C9BE0; --accent-blue-soft:#253566;
+    --accent-lime:#C6FA1E; --accent-lime-soft:#33401A;
+    --marker-ink:#ECEDF7; --track-b-text:#D8F16B; --rule-mark:#D8F16B;
+    --call-bg:#2E1B7A; --call-text:#F2F1FF;
+    --warn:#FF8A8A; --warn-soft:#4A1A2E; --amber:#FFC266; --amber-soft:#43301A;
+    --on-accent:#120B33;
+    --shadow:0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#120B33; --surface:#1B1348; --surface-2:#241A5C; --border:#362B70;
+  --text:#ECEDF7; --text-soft:#B4B6D6; --text-faint:#8A8CB3;
+  --accent-blue:#7C9BE0; --accent-blue-soft:#253566;
+  --accent-lime:#C6FA1E; --accent-lime-soft:#33401A;
+  --marker-ink:#ECEDF7; --track-b-text:#D8F16B; --rule-mark:#D8F16B;
+  --call-bg:#2E1B7A; --call-text:#F2F1FF;
+  --warn:#FF8A8A; --warn-soft:#4A1A2E; --amber:#FFC266; --amber-soft:#43301A;
+  --on-accent:#120B33;
+  --shadow:0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+}
+*{box-sizing:border-box}
+html,body{margin:0;overflow-x:hidden}
+body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.55;font-size:15px}
+h1,h2,h3{font-family:Poppins,Inter,system-ui,sans-serif;text-wrap:balance;margin:0}
+.mono{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
+a{color:var(--accent-blue)}
+.wrap{max-width:1000px;margin:0 auto;padding:2.5rem 1.5rem 6rem}
+@media (max-width:600px){.wrap{padding:1.25rem .9rem 5rem}}
+
+.verbar{display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;font-size:.8rem;color:var(--text-soft);margin-bottom:1rem}
+.verbar .tag{font-family:"JetBrains Mono",monospace;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:.15rem .6rem;color:var(--rule-mark);font-weight:600}
+.verbar .spacer{flex:1}
+.btn-theme{background:var(--surface);border:1px solid var(--border);color:var(--text-soft);border-radius:999px;padding:.25rem .7rem;font:inherit;font-size:.8rem;cursor:pointer}
+
+.hero{position:relative;overflow:hidden;border-radius:20px;padding:2rem 1.75rem;color:#fff;background:linear-gradient(135deg,#150C3D 0%,#241660 55%,#2E1B7A 100%);box-shadow:var(--shadow)}
+.hero::after{content:"";position:absolute;inset:0;background-image:radial-gradient(circle at 1px 1px,rgba(255,255,255,0.06) 1px,transparent 0);background-size:18px 18px;pointer-events:none}
+.hero>*{position:relative;z-index:1}
+.kicker{font-family:"JetBrains Mono",monospace;color:#C6FA1E;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600}
+.hero h1{font-size:clamp(1.6rem,3.6vw,2.3rem);font-weight:800;margin:.35rem 0 .4rem;line-height:1.15}
+.hero p{margin:0;color:#D9D7F5;max-width:660px}
+.funil{display:grid;grid-template-columns:repeat(auto-fit,minmax(108px,1fr));gap:.75rem;margin-top:1.5rem}
+.funil div{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.10);border-radius:12px;padding:.7rem .8rem}
+.funil b{display:block;font-family:"JetBrains Mono",monospace;font-variant-numeric:tabular-nums;font-size:1.6rem;line-height:1.1}
+.funil span{font-size:.72rem;color:#C9C6EE;text-transform:uppercase;letter-spacing:.04em}
+.funil .hot b{color:#C6FA1E}
+
+.controls{margin-top:1.25rem;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1rem;box-shadow:var(--shadow);display:grid;gap:.8rem}
+.row{display:flex;flex-wrap:wrap;gap:.45rem;align-items:center}
+.row.off{opacity:.45}
+.lbl{font-family:"JetBrains Mono",monospace;font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-faint);min-width:72px}
+.chip{border:1px solid var(--border);background:var(--surface-2);color:var(--text-soft);border-radius:999px;padding:.32rem .75rem;font:inherit;font-size:.85rem;cursor:pointer;user-select:none}
+.chip.sub{font-size:.76rem;padding:.2rem .6rem}
+.chip[aria-pressed="true"]{background:var(--accent-blue);border-color:var(--accent-blue);color:var(--on-accent)}
+.chip.sub[aria-pressed="true"]{background:var(--accent-blue-soft);color:var(--accent-blue);border-color:var(--accent-blue)}
+select,input[type=search]{font:inherit;font-size:.88rem;color:var(--text);background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:.38rem .6rem}
+input[type=search]{flex:1;min-width:180px}
+label.chk{display:flex;gap:.35rem;align-items:center;font-size:.85rem;color:var(--text-soft);cursor:pointer}
+.btn{font:inherit;font-size:.85rem;font-weight:600;border-radius:10px;padding:.42rem .85rem;cursor:pointer;border:1px solid var(--border);background:var(--surface-2);color:var(--text)}
+.btn.primary{background:var(--accent-blue);border-color:var(--accent-blue);color:var(--on-accent)}
+.btn:disabled{opacity:.55;cursor:default}
+.status{font-size:.82rem;color:var(--text-soft)}
+
+.alert{margin-top:1.25rem;background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--accent-lime);border-radius:12px;padding:.85rem 1rem;font-size:.88rem;color:var(--text-soft)}
+.alert b{color:var(--text)}
+.alert ul{margin:.35rem 0 0;padding-left:1.1rem}
+
+.sec{display:flex;align-items:baseline;gap:.6rem;margin:2rem 0 .75rem}
+.sec h2{font-size:1.15rem;font-weight:700}
+.sec .count{font-family:"JetBrains Mono",monospace;color:var(--text-faint);font-size:.85rem}
+
+.list{display:grid;gap:.75rem}
+.ed{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--accent-blue);border-radius:14px;padding:.95rem 1rem;box-shadow:var(--shadow)}
+.ed.urg{border-left-color:var(--warn)}
+.ed.soon{border-left-color:var(--amber)}
+.ed.weak{opacity:.82;border-left-style:dashed}
+.ed.disc{opacity:.45}
+.ed .top{display:flex;flex-wrap:wrap;gap:.35rem;align-items:center}
+.pill{font-size:.7rem;font-weight:600;border-radius:999px;padding:.12rem .55rem;background:var(--accent-blue-soft);color:var(--accent-blue);white-space:nowrap}
+.pill small{font-weight:500;opacity:.8}
+.pill.lime{background:var(--accent-lime-soft);color:var(--track-b-text)}
+.pill.ghost{background:transparent;border:1px dashed var(--border);color:var(--text-faint)}
+.pill.new{background:var(--call-bg);color:var(--call-text)}
+.ed .days{margin-left:auto;font-family:"JetBrains Mono",monospace;font-variant-numeric:tabular-nums;font-size:.8rem;color:var(--text-soft);white-space:nowrap}
+.ed h3{font-size:1rem;font-weight:600;margin:.5rem 0 .15rem;line-height:1.3}
+.ed .meta{font-size:.8rem;color:var(--text-faint)}
+.ed .meta .mono{color:var(--text-soft)}
+.ed .obj{margin:.5rem 0 .6rem;font-size:.9rem;color:var(--text);overflow-wrap:anywhere}
+.ed .itens{margin:-.2rem 0 .6rem;background:var(--surface-2);border-radius:8px;padding:.45rem .65rem;font-size:.8rem;color:var(--text-soft);display:grid;gap:.2rem;overflow-wrap:anywhere}
+.ed .itens b{font-family:"JetBrains Mono",monospace;font-variant-numeric:tabular-nums;color:var(--text);font-weight:600}
+.ed .foot{display:flex;flex-wrap:wrap;gap:.5rem .9rem;align-items:center;font-size:.82rem}
+.ed .foot .val{font-family:"JetBrains Mono",monospace;font-variant-numeric:tabular-nums;font-weight:600}
+.ed .foot .sp{flex:1}
+.mark{font:inherit;font-size:.78rem;border:1px solid var(--border);background:var(--surface-2);color:var(--text-soft);border-radius:8px;padding:.2rem .55rem;cursor:pointer}
+.mark[aria-pressed="true"].int{background:var(--accent-lime-soft);color:var(--track-b-text);border-color:var(--accent-lime)}
+.mark[aria-pressed="true"].dis{background:var(--warn-soft);color:var(--warn);border-color:var(--warn)}
+.empty{background:var(--surface);border:1px dashed var(--border);border-radius:14px;padding:1.5rem;text-align:center;color:var(--text-soft)}
+.src{margin-top:2.5rem;font-size:.78rem;color:var(--text-faint);border-top:1px solid var(--border);padding-top:1rem}
+.toast{position:fixed;left:50%;bottom:1.25rem;transform:translateX(-50%);background:var(--call-bg);color:var(--call-text);padding:.55rem 1rem;border-radius:10px;font-size:.85rem;box-shadow:var(--shadow);opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:1}
+@media print{.controls,.mark,.btn-theme{display:none}.ed,.hero{break-inside:avoid-page}*{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="verbar">
+  <span class="tag">v4 · 08/11/2026</span>
+  <span>Filtro "★ Só interesse": mostra os editais marcados, inclusive os que já encerraram ou saíram da busca.</span>
+  <span class="spacer"></span>
+  <button class="btn-theme" id="themeBtn" type="button">Tema</button>
+</div>
+
+<header class="hero">
+  <div class="kicker">PNCP · consulta ao vivo · base Leme/SP</div>
+  <h1>Editais abertos para a Nano</h1>
+  <p>Licitações recebendo proposta agora: Sophos, Acronis e Microsoft no Brasil todo, e suporte de TI só perto de Leme. O objeto e a lista de itens de cada edital são conferidos.</p>
+  <div class="funil">
+    <div><b id="nTotal">–</b><span>Abertos no raio</span></div>
+    <div class="hot"><b id="n7">–</b><span>Fecham em 7 dias</span></div>
+    <div><b id="nSeg">–</b><span>Sophos</span></div>
+    <div><b id="nBackup">–</b><span>Backup</span></div>
+    <div><b id="nM365">–</b><span>Microsoft</span></div>
+    <div><b id="nSup">–</b><span>Suporte TI</span></div>
+    <div><b id="nLD">–</b><span>No Licitar Digital</span></div>
+    <div class="hot"><b id="nInt">–</b><span>★ Interesse</span></div>
+  </div>
+</header>
+
+<section class="controls" aria-label="Filtros">
+  <div class="row">
+    <span class="lbl">Frentes</span>
+    <button class="chip" data-grupo="sophos" aria-pressed="true" type="button">Sophos</button>
+    <button class="chip" data-grupo="backup" aria-pressed="true" type="button">Backup · Acronis</button>
+    <button class="chip" data-grupo="m365" aria-pressed="true" type="button">Microsoft · M365</button>
+    <button class="chip" data-grupo="sup" aria-pressed="true" type="button">Suporte de TI</button>
+  </div>
+  <div class="row" id="linhasSophos"><span class="lbl">Linhas Sophos</span></div>
+  <div class="row">
+    <span class="lbl">Suporte</span>
+    <select id="raioSup" aria-label="Raio do suporte de TI a partir de Leme">
+      <option value="100">até 100 km</option>
+      <option value="150" selected>até 150 km</option>
+      <option value="200">até 200 km</option>
+    </select>
+    <span class="lbl">Demais</span>
+    <select id="alcance" aria-label="Alcance de Sophos, backup e Microsoft">
+      <option value="99999" selected>Brasil todo</option>
+      <option value="500">até 500 km</option>
+      <option value="300">até 300 km</option>
+      <option value="150">até 150 km</option>
+    </select>
+    <select id="uf" aria-label="UF"><option value="">Todas as UFs</option></select>
+    <select id="ordem" aria-label="Ordenar">
+      <option value="prazo">Ordenar por prazo</option>
+      <option value="km">Ordenar por distância</option>
+    </select>
+  </div>
+  <div class="row">
+    <input type="search" id="busca" placeholder="Filtrar por órgão, cidade ou palavra do objeto">
+  </div>
+  <div class="row">
+    <label class="chk"><input type="checkbox" id="soInt"> <b>★ Só interesse</b> (<span id="cInt">0</span>)</label>
+    <label class="chk"><input type="checkbox" id="fracos"> Mostrar possíveis (termo só nos anexos)</label>
+    <label class="chk"><input type="checkbox" id="ocultarDesc" checked> Ocultar descartados</label>
+    <label class="chk"><input type="checkbox" id="soLD"> Só Licitar Digital</label>
+  </div>
+  <div class="row">
+    <button class="btn primary" id="btnAtualizar" type="button">Atualizar do PNCP</button>
+    <button class="btn" id="btnCsv" type="button">Exportar CSV</button>
+    <button class="btn" id="btnZap" type="button">Copiar p/ WhatsApp</button>
+    <span class="status" id="status">Carregando…</span>
+  </div>
+</section>
+
+<div class="alert">
+  <b>Como ler:</b> cada card é um edital com proposta aberta. A busca usa termos genéricos (firewall, EDR, XDR, backup em nuvem, licença Microsoft…) porque marca quase nunca aparece no objeto.
+  <ul>
+    <li><b>Confirmado no objeto</b>: o termo está na descrição do edital (para suporte, também precisa ter contexto de TI).</li>
+    <li><b>Confirmado nos itens</b>: o termo está em um item da lista, por exemplo um "gateway de rede com firewall" dentro de uma ata de informática. O card mostra qual item.</li>
+    <li><b>Possível</b>: o PNCP achou o termo, mas só nos anexos (TR, edital em PDF). Fica oculto por padrão.</li>
+    <li><b>Suporte de TI</b> só aparece até o raio escolhido (150 ou 200 km de Leme). <b>Sophos, backup e Microsoft</b> vêm do Brasil todo; use UF ou alcance para afunilar.</li>
+    <li><b>★ Interesse</b> e <b>✕ Descartar</b> ficam salvos neste aparelho e neste endereço. Marque "★ Só interesse" para ver só os seus, inclusive os que já encerraram.</li>
+    <li>A linha <b>Wi-Fi/switch</b> começa desligada porque traz muita compra de switch comum. Ligue quando quiser ver.</li>
+  </ul>
+</div>
+
+<div class="sec"><h2>Editais</h2><span class="count" id="countLbl"></span></div>
+<div class="list" id="lista"><div class="empty">Consultando o PNCP…</div></div>
+
+<div class="src">
+  Fonte: API de busca do PNCP (pncp.gov.br/api/search, editais com status "recebendo proposta"; suporte restrito a SP e MG), API de itens do PNCP (pncp.gov.br/api/pncp/v1/…/itens) e API de consulta do PNCP para valor estimado e link do sistema de origem. Os dados são consultados toda vez que a página abre ou ao clicar em Atualizar; a conferência de itens fica guardada por 12 horas neste navegador. Distâncias em linha reta a partir das coordenadas IBGE dos municípios.
+  Marcações (interesse/descartado) e "novo" ficam salvas só neste navegador.
+  <span id="lastRun"></span>
+</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+"use strict";
+const MUN = __MUN__; // código IBGE -> km de Leme (todos os municípios do Brasil)
+const UFS_SUP = "SP|MG";
+const SEARCH = "https://pncp.gov.br/api/search/";
+const CONSULTA = "https://pncp.gov.br/api/consulta/v1/orgaos/";
+const ITENS = "https://pncp.gov.br/api/pncp/v1/orgaos/";
+const ITENS_TTL = 12 * 3600 * 1000;
+
+// ---- regras de relevância (texto normalizado: minúsculo, sem acento)
+const SUP_ACT = /suporte|help ?desk|service ?desk|manutenc|assistencia tecnica|outsourcing|terceirizac|gerenciamento|monitoramento|sustentac|administracao de (rede|servidor)|central de (atendimento|servicos)|servicos (tecnicos |continuados |especializados |de suporte )*(de|em) (tecnologia da informacao|informatica|ti\b)/;
+const SUP_TI  = /informatica|tecnologia da informacao|\bti\b|\btic\b|computador|notebook|rede (logica|de dados|de computadores)|servidor|data ?center|help ?desk|service ?desk|parque tecnologico/;
+const SUP_NEG = /sistema (integrado )?de gestao|software de gestao|plataforma (integrada )?de gestao|gestao (publica|municipal)|cftv|videomonitoramento|impressora|impressao|outsourcing de impress|telefonia|veicul|equipamentos medic|hospitalar|viage|turismo|passage/;
+const BKP_FORTE = /acronis|copias? de seguranca|recuperacao de desastre|armazenamento em nuvem/;
+const BKP_TI  = /dados|informatica|\bti\b|\btic\b|servidor|sistema|nuvem|software|armazenamento|digital|arquivo/;
+const BKP_NEG = /oxigenio|cilindro|medicinal|gerador/;
+const ehSuporte = n => SUP_ACT.test(n) && SUP_TI.test(n) && !SUP_NEG.test(n);
+// segurança patrimonial/eletrônica e obras usam as mesmas palavras ("monitoramento de segurança", "VPN" do alarme…)
+const SEG_NEG = /vigilancia|patrimonial|alarme|cftv|videomonitoramento|portaria|obra|construcao|pavimentacao|reforma/;
+const ITEM_NEG_GERAL = /^(contratacao de empresa para execucao de obra|execucao de obra|obra|construcao|reforma|pavimentacao)/;
+
+const CATS = {
+  fw:      { grupo:"sophos", nome:"Firewall",
+             terms:['firewall','ngfw','utm','"firewall de próxima geração"','"equipamento segurança rede"','"sd-wan"','"filtro de conteúdo"','"filtragem de conteúdo"'],
+             re:/firewall|\butm\b|ngfw|sd-?wan|equipamento seguranca rede|seguranca de perimetro|filtr(o|agem) de conteudo|filtro web|controle de navegacao/ },
+  edp:     { grupo:"sophos", nome:"Endpoint/EDR/XDR",
+             terms:['antivírus','endpoint','edr','xdr','antimalware','ransomware','"proteção de servidores"','"detecção e resposta"'],
+             re:/antivirus|anti-virus|endpoint|\bedr\b|\bxdr\b|\bndr\b|\bitdr\b|antimalware|ransomware|deteccao e resposta|protecao (de|para) servidores/ },
+  mdr:     { grupo:"sophos", nome:"MDR/SOC",
+             terms:['mdr','"centro de operações de segurança"','"monitoramento de segurança"','"resposta a incidentes"'],
+             re:/\bmdr\b|centro de operacoes de seguranca|monitoramento de seguranca|resposta a incidentes|\bsiem\b/, neg:SEG_NEG },
+  ztna:    { grupo:"sophos", nome:"ZTNA/VPN",
+             terms:['ztna','"zero trust"','"acesso remoto seguro"','vpn'],
+             re:/ztna|zero trust|acesso remoto seguro|\bvpn\b/, neg:SEG_NEG },
+  email:   { grupo:"sophos", nome:"E-mail seguro",
+             terms:['antispam','"segurança de e-mail"','"proteção de e-mail"'],
+             re:/anti-?spam|seguranca de e-?mail|protecao de e-?mail|filtro de e-?mail|gateway de e-?mail/ },
+  vuln:    { grupo:"sophos", nome:"Nuvem/vulnerabilidades",
+             terms:['"segurança em nuvem"','"gestão de vulnerabilidades"','"análise de vulnerabilidades"','"teste de intrusão"','pentest'],
+             re:/seguranca (em|na|de) nuvem|cnapp|cspm|vulnerabilidade|pentest|teste de intrusao/, neg:SEG_NEG },
+  aware:   { grupo:"sophos", nome:"Phishing/conscientização",
+             terms:['phishing','"conscientização em segurança"'],
+             re:/phishing|conscientizacao (em|de|sobre) seguranca/ },
+  seginfo: { grupo:"sophos", nome:"Segurança da informação",
+             terms:['sophos','"segurança da informação"','"segurança de rede"','"segurança cibernética"','cibersegurança'],
+             re:/sophos|seguranca (da informacao|de rede|ciberneti)|ciberseguranca/, neg:SEG_NEG },
+  rede:    { grupo:"sophos", nome:"Wi-Fi/switch", off:true,
+             terms:['"access point"','"ponto de acesso"','"rede sem fio"','switch'],
+             re:/access point|ponto de acesso (sem fio|wireless|wi-?fi)|rede sem fio|wi-?fi (corporativo|gerenciad)|\bswitch(es)?\b/ },
+  backup:  { grupo:"backup", nome:"Backup",
+             terms:['acronis','backup','"backup em nuvem"','"cópia de segurança"','"cópias de segurança"','"recuperação de desastres"','"armazenamento em nuvem"'],
+             forte: n => (BKP_FORTE.test(n) || (/backup/.test(n) && BKP_TI.test(n))) && !BKP_NEG.test(n),
+             itemRe:/acronis|veeam|backup|copias? de seguranca|recuperacao de desastre|armazenamento em nuvem/,
+             itemNeg:/oxigenio|cilindro|medicinal|gerador|videomonitoramento|cftv|\bsom\b|audio/ },
+  m365:    { grupo:"m365", nome:"Microsoft",
+             terms:['"microsoft 365"','"office 365"','"licenças microsoft"','"licença microsoft"','"pacote office"','"exchange online"','"correio eletrônico"','"e-mail corporativo"','microsoft'],
+             re:/microsoft|\boffice\b|\bm365\b|exchange|correio eletronico|e-?mails? (corporativo|institucional)/, neg:/cadeira|poltrona/,
+             itemRe:/microsoft 365|\boffice\b|\bm365\b|exchange|licenca[^.]{0,40}microsoft|windows server/,
+             itemNeg:/cadeira|poltrona|curso|capacitacao|treinamento|^(notebook|computador|microcomputador|mini ?pc|desktop|all in one|tablet|smartphone|celular|estacao de trabalho)/ },
+  sup:     { grupo:"sup", nome:"Suporte TI",
+             terms:['"suporte técnico"','"help desk"','"service desk"','"manutenção de computadores"','"manutenção preventiva e corretiva"','"assistência técnica"','"outsourcing de ti"','"terceirização de ti"','"tecnologia da informação"','"infraestrutura de ti"','"rede lógica"','"gerenciamento de rede"'],
+             forte: ehSuporte, itemFn: () => false }  // suporte é serviço: vale o objeto, não a ficha de item
+};
+function forteEm(cat, n){ const c = CATS[cat]; if(c.forte) return c.forte(n); return c.re.test(n) && !(c.neg && c.neg.test(n)); }
+function itemCasa(cat, n){ const c = CATS[cat]; if(ITEM_NEG_GERAL.test(n)) return false; if(c.itemFn) return c.itemFn(n); const re = c.itemRe || c.re, neg = c.itemNeg || c.neg; return re.test(n) && !(neg && neg.test(n)); }
+const nomeCat = c => (CATS[c].grupo === "sophos" ? "Sophos · " : "") + CATS[c].nome;
+
+const $ = s => document.querySelector(s);
+const norm = s => (s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase();
+const esc = s => String(s==null?"":s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+// ---- armazenamento local (tolerante a falhas)
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem("nanoEditais."+k); return v ? JSON.parse(v) : d; }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem("nanoEditais."+k, JSON.stringify(v)); }catch(e){} }
+};
+let marks = store.get("marks", {});
+let snaps = store.get("snaps", {}); // cópia dos editais com interesse, para não sumirem quando saem da busca
+const SNAP_CAMPOS = ["orgao_nome","unidade_nome","municipio_nome","uf","description","title","modalidade_licitacao_nome","item_url","usuario_nome","orgao_cnpj","ano","numero_sequencial","valor_global","codigo_ibge"];
+function snapshot(rec){
+  const it = {}; SNAP_CAMPOS.forEach(k => { if(rec.it[k] != null) it[k] = rec.it[k]; });
+  return { id: rec.id, km: rec.km, fim: rec.fim ? rec.fim.toISOString() : null, ini: rec.ini ? rec.ini.toISOString() : null,
+           so: [...rec.strong], si: [...(rec.strongItens || [])], cats: [...rec.cats], itens: rec.itens || null, it };
+}
+function deSnap(s){
+  return { id: s.id, it: s.it, km: s.km, fim: s.fim ? new Date(s.fim) : null, ini: s.ini ? new Date(s.ini) : null,
+           n: norm((s.it.title||"") + " " + (s.it.description||"")), cats: new Set(s.cats || []), strong: new Set(s.so || []),
+           strongItens: new Set(s.si || []), itens: s.itens, _snap: true };
+}
+let itensCache = store.get("itens", {});
+const prevSeen = new Set(store.get("seen", []));
+const firstVisit = prevSeen.size === 0;
+
+// ---- tema
+function applyTheme(t){ if(t) document.documentElement.setAttribute("data-theme", t); else document.documentElement.removeAttribute("data-theme"); }
+applyTheme(store.get("theme", null));
+$("#themeBtn").addEventListener("click", () => {
+  const cur = document.documentElement.getAttribute("data-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  const nxt = cur === "dark" ? "light" : "dark"; applyTheme(nxt); store.set("theme", nxt);
+});
+
+// ---- chips das linhas Sophos
+const linhasRow = $("#linhasSophos");
+for(const [k, c] of Object.entries(CATS)){
+  if(c.grupo !== "sophos") continue;
+  const b = document.createElement("button");
+  b.className = "chip sub"; b.type = "button"; b.dataset.linha = k; b.textContent = c.nome;
+  b.setAttribute("aria-pressed", c.off ? "false" : "true");
+  linhasRow.appendChild(b);
+}
+const savedG = store.get("grupos", null), savedL = store.get("linhas", null);
+if(savedG) document.querySelectorAll(".chip[data-grupo]").forEach(b => b.setAttribute("aria-pressed", savedG.includes(b.dataset.grupo)));
+if(savedL) document.querySelectorAll(".chip[data-linha]").forEach(b => b.setAttribute("aria-pressed", savedL.includes(b.dataset.linha)));
+function catsAtivas(){
+  const g = new Set([...document.querySelectorAll(".chip[data-grupo][aria-pressed=true]")].map(b => b.dataset.grupo));
+  const l = new Set([...document.querySelectorAll(".chip[data-linha][aria-pressed=true]")].map(b => b.dataset.linha));
+  linhasRow.classList.toggle("off", !g.has("sophos"));
+  return new Set(Object.keys(CATS).filter(c => g.has(CATS[c].grupo) && (CATS[c].grupo !== "sophos" || l.has(c))));
+}
+
+// ---- estado
+let items = new Map();   // id -> registro
+let details = new Map(); // id -> detalhe da API de consulta
+let running = false;
+
+function setStatus(t){ $("#status").textContent = t; }
+function toast(t){ const el=$("#toast"); el.textContent=t; el.classList.add("on"); setTimeout(()=>el.classList.remove("on"), 1800); }
+function horaAgora(){ return new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}); }
+
+async function pool(tasks, n, onTick){
+  let i=0, done=0; const out=new Array(tasks.length);
+  async function worker(){ while(i<tasks.length){ const k=i++; try{ out[k]=await tasks[k](); }catch(e){ out[k]={__err:e}; } done++; onTick && onTick(done, tasks.length); } }
+  await Promise.all(Array.from({length:Math.min(n,tasks.length)}, worker));
+  return out;
+}
+const conf = rec => { const s = new Set(rec.strong); if(rec.strongItens) rec.strongItens.forEach(c => s.add(c)); return s; };
+
+async function buscar(){
+  if(running) return; running = true;
+  $("#btnAtualizar").disabled = true;
+  const termCats = new Map();
+  for(const [cat, c] of Object.entries(CATS)) for(const t of c.terms){ if(!termCats.has(t)) termCats.set(t, []); termCats.get(t).push(cat); }
+  const jobs = [...termCats.entries()].map(([t, cats]) => async () => {
+    const soSup = cats.every(c => c === "sup");
+    const base = SEARCH + "?q=" + encodeURIComponent(t) + "&tipos_documento=edital&ordenacao=-data&tam_pagina=500&status=recebendo_proposta" + (soSup ? "&ufs=" + UFS_SUP : "");
+    let todos = [];
+    for(let p = 1; p <= 4; p++){
+      const r = await fetch(base + "&pagina=" + p);
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      const j = await r.json(); const its = j.items || [];
+      todos = todos.concat(its);
+      if(its.length < 500 || todos.length >= (j.total || 0)) break;
+    }
+    return { cats, items: todos };
+  });
+  let falhas = 0;
+  const res = await pool(jobs, 6, (d,n) => setStatus("Buscando no PNCP… "+d+"/"+n));
+  const fresh = new Map();
+  const agora = Date.now();
+  for(const r of res){
+    if(!r || r.__err){ falhas++; continue; }
+    for(const it of r.items){
+      const id = it.numero_controle_pncp || it.id;
+      const km = MUN[String(it.codigo_ibge||"")];
+      if(km === undefined) continue;
+      const fim = it.data_fim_vigencia ? new Date(it.data_fim_vigencia) : null;
+      if(fim && fim.getTime() < agora) continue;
+      let rec = fresh.get(id);
+      if(!rec){
+        rec = { id, it, km, fim, ini: it.data_inicio_vigencia ? new Date(it.data_inicio_vigencia) : null,
+                n: norm((it.title||"") + " " + (it.description||"")), cats:new Set(), strong:new Set(), strongItens:null, itens:null };
+        fresh.set(id, rec);
+      }
+      r.cats.forEach(c => rec.cats.add(c));
+    }
+  }
+  for(const rec of fresh.values()){
+    for(const cat of Object.keys(CATS)) if(forteEm(cat, rec.n)){ rec.strong.add(cat); rec.cats.add(cat); }
+    const c = itensCache[rec.id];
+    if(c && Date.now() - c.t < ITENS_TTL) aplicaItens(rec, c.m);
+  }
+  items = fresh;
+  running = false;
+  $("#btnAtualizar").disabled = false;
+  $("#lastRun").textContent = "Última consulta: " + new Date().toLocaleString("pt-BR") + (falhas ? " · " + falhas + " busca(s) falharam" : "") + ".";
+  window.__falhasBusca = falhas;
+  atualizaSnaps();
+  preencheUFs();
+  render();
+  store.set("seen", Array.from(new Set([...prevSeen, ...items.keys()])).slice(-3000));
+  await verificarItens();
+}
+
+// cópias dos marcados com interesse: renova com os dados atuais quando o edital ainda está na busca
+function atualizaSnaps(){
+  for(const [id, m] of Object.entries(marks)) if(m === "interesse" && items.has(id)) snaps[id] = snapshot(items.get(id));
+  for(const id of Object.keys(snaps)) if(marks[id] !== "interesse") delete snaps[id];
+  store.set("snaps", snaps);
+}
+const recInteresse = id => items.get(id) || (snaps[id] ? deSnap(snaps[id]) : null);
+const idsInteresse = () => Object.keys(marks).filter(id => marks[id] === "interesse" && recInteresse(id));
+
+// ---- conferência dos itens de cada edital
+function aplicaItens(rec, m){ rec.itens = m; rec.strongItens = new Set(Object.keys(m).filter(c => !rec.strong.has(c))); }
+let verifRodando = false, verifPendente = false;
+async function verificarItens(){
+  if(verifRodando){ verifPendente = true; return; }
+  verifRodando = true;
+  const f0 = filtros();
+  const cand = [...items.values()].filter(r => !r.itens && passaUF(r, f0) && !elegiveis(r, f0).length
+      && [...r.cats].some(c => c !== "sup" && f0.ativas.has(c) && dentro(r, c, f0)));
+  if(cand.length){
+    let mudou = 0;
+    await pool(cand.map(rec => async () => {
+      const it = rec.it; let arr = [];
+      for(let p = 1; p <= 4; p++){
+        const r = await fetch(ITENS + it.orgao_cnpj + "/compras/" + it.ano + "/" + it.numero_sequencial + "/itens?pagina=" + p + "&tamanhoPagina=500");
+        if(!r.ok) throw new Error("HTTP " + r.status);
+        const j = await r.json(); const a = Array.isArray(j) ? j : (j.data || []);
+        arr = arr.concat(a); if(a.length < 500) break;
+      }
+      const m = {};
+      for(const x of arr){
+        // só o nome do item (começo da descrição): a ficha técnica longa cita "backup", "suporte" etc. de passagem
+        const n = norm((x.descricao||"").slice(0, 100));
+        for(const cat of Object.keys(CATS)) if(itemCasa(cat, n)) (m[cat] = m[cat] || []).push([x.numeroItem, (x.descricao||"").replace(/\s+/g," ").slice(0,140), x.quantidade, x.unidadeMedida, x.valorTotal]);
+      }
+      for(const k in m) m[k] = m[k].slice(0, 5);
+      itensCache[rec.id] = { t: Date.now(), m };
+      aplicaItens(rec, m);
+      if(Object.keys(m).length && ++mudou % 5 === 0) render();
+    }), 6, (d,n) => setStatus("Conferindo itens dos editais… " + d + "/" + n));
+    const ks = Object.keys(itensCache);
+    if(ks.length > 1500) ks.sort((a,b) => itensCache[a].t - itensCache[b].t).slice(0, ks.length - 1500).forEach(k => delete itensCache[k]);
+    store.set("itens", itensCache);
+  }
+  atualizaSnaps();
+  const f = window.__falhasBusca || 0;
+  setStatus(f ? "Atualizado com " + f + " falha(s) na busca — tente de novo." : "Atualizado às " + horaAgora());
+  render();
+  verifRodando = false;
+  if(verifPendente){ verifPendente = false; verificarItens(); }
+}
+
+function filtros(){
+  return {
+    ativas: catsAtivas(),
+    supRaio: +$("#raioSup").value,
+    alcance: +$("#alcance").value,
+    uf: $("#uf").value,
+    ordem: $("#ordem").value,
+    soInt: $("#soInt").checked,
+    fracos: $("#fracos").checked,
+    ocultarDesc: $("#ocultarDesc").checked,
+    soLD: $("#soLD").checked,
+    q: norm($("#busca").value.trim())
+  };
+}
+const isLD = rec => /licitar digital/i.test(rec.it.usuario_nome || "") || /licitardigital/i.test((details.get(rec.id)||{}).linkSistemaOrigem || "");
+function diasAte(d){ if(!d) return null; return Math.ceil((d.getTime() - Date.now())/86400000); }
+// suporte respeita o raio do suporte; as demais frentes, o alcance escolhido
+const dentro = (rec, c, f) => rec.km <= (c === "sup" ? f.supRaio : f.alcance);
+const passaUF = (rec, f) => !f.uf || rec.it.uf === f.uf;
+const elegiveis = (rec, f) => [...conf(rec)].filter(c => f.ativas.has(c) && dentro(rec, c, f));
+function preencheUFs(){
+  const sel = $("#uf"); const cur = sel.value || ((store.get("filtros", {}) || {}).uf || "");
+  const ufs = [...new Set([...items.values()].map(r => r.it.uf).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">Todas as UFs</option>' + ufs.map(u => '<option' + (u === cur ? ' selected' : '') + '>' + esc(u) + '</option>').join("");
+}
+
+function visiveis(){
+  const f = filtros();
+  const out = [];
+  const prazo0 = r => r.fim ? r.fim.getTime() : 9e15;
+  if(f.soInt){
+    // só os marcados com interesse, sem filtro de frente, raio ou UF
+    for(const id of idsInteresse()){
+      const rec = recInteresse(id);
+      if(f.q){ const hay = rec.n + " " + norm(rec.it.orgao_nome) + " " + norm(rec.it.municipio_nome) + " " + norm(rec.it.unidade_nome); if(!hay.includes(f.q)) continue; }
+      out.push({ rec, forte: true, confirmadas: [...conf(rec)] });
+    }
+    out.sort((a,b) => prazo0(a.rec) - prazo0(b.rec));
+    return out;
+  }
+  for(const rec of items.values()){
+    if(!passaUF(rec, f)) continue;
+    const confirmadas = elegiveis(rec, f);
+    const forte = confirmadas.length > 0;
+    const fraco = !forte && [...rec.cats].some(c => f.ativas.has(c) && dentro(rec, c, f));
+    if(!forte && !(fraco && f.fracos)) continue;
+    if(f.ocultarDesc && marks[rec.id] === "descartado") continue;
+    if(f.soLD && !isLD(rec)) continue;
+    if(f.q){ const hay = rec.n + " " + norm(rec.it.orgao_nome) + " " + norm(rec.it.municipio_nome) + " " + norm(rec.it.unidade_nome); if(!hay.includes(f.q)) continue; }
+    out.push({ rec, forte, confirmadas });
+  }
+  const prazo = r => r.fim ? r.fim.getTime() : 9e15;
+  out.sort(f.ordem === "km" ? (a,b) => (a.rec.km - b.rec.km) || (prazo(a.rec) - prazo(b.rec)) : (a,b) => prazo(a.rec) - prazo(b.rec));
+  return out;
+}
+
+function fmtData(d){ return d ? d.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"}) + " " + d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}) : "—"; }
+function fmtValor(v){ return (v && v > 0) ? v.toLocaleString("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:0}) : null; }
+function plataforma(rec){ const d = details.get(rec.id); if(isLD(rec)) return "Licitar Digital"; return (d && d.usuarioNome) || rec.it.usuario_nome || "—"; }
+function linkPncp(rec){ const u = rec.it.item_url || ""; return "https://pncp.gov.br/app/editais" + u.replace(/^\/compras/,""); }
+function itensDe(rec, cats){
+  if(!rec.itens) return [];
+  const vistos = new Set(), out = [];
+  for(const c of cats){ if(rec.strong.has(c)) continue; for(const x of (rec.itens[c] || [])){ if(!vistos.has(x[0])){ vistos.add(x[0]); out.push(x); } } }
+  return out;
+}
+function itemTxt(x){ const v = fmtValor(x[4]); return "Item " + x[0] + " · " + x[1] + (x[2] ? " · " + x[2] + " " + (x[3]||"") : "") + (v ? " · " + v : ""); }
+
+function card(v){
+  const { rec, forte, confirmadas } = v; const it = rec.it; const d = details.get(rec.id) || {};
+  const dias = diasAte(rec.fim);
+  const cls = ["ed"]; if(!forte) cls.push("weak"); if(marks[rec.id]==="descartado") cls.push("disc");
+  if(dias !== null && dias <= 3) cls.push("urg"); else if(dias !== null && dias <= 7) cls.push("soon");
+  const pills = [];
+  if(!firstVisit && !prevSeen.has(rec.id)) pills.push('<span class="pill new">novo</span>');
+  for(const c of confirmadas) pills.push('<span class="pill">' + esc(nomeCat(c)) + (rec.strong.has(c) ? "" : ' <small>· nos itens</small>') + '</span>');
+  if(!forte){ const ff = filtros(); for(const c of rec.cats) if(ff.ativas.has(c) && dentro(rec, c, ff)) pills.push('<span class="pill ghost">possível · ' + esc(nomeCat(c)) + '</span>'); }
+  if(isLD(rec)) pills.push('<span class="pill lime">Licitar Digital</span>');
+  const encerrado = rec.fim && rec.fim.getTime() < Date.now();
+  if(rec._snap) pills.push('<span class="pill ghost">' + (encerrado ? "encerrado" : "fora da busca atual") + '</span>');
+  const diasTxt = dias === null ? "" : (encerrado ? "encerrado" : (dias <= 0 ? "fecha hoje" : (dias === 1 ? "fecha amanhã" : "fecha em "+dias+" dias")));
+  const valor = fmtValor(d.valorTotalEstimado) || fmtValor(it.valor_global);
+  const origem = d.linkSistemaOrigem ? '<a href="'+esc(d.linkSistemaOrigem)+'" target="_blank" rel="noopener">Sistema de origem ↗</a>' : "";
+  const m = marks[rec.id] || "";
+  const obj = (it.description || it.title || "").replace(/^\[[^\]]+\]\s*-\s*/,"");
+  const its = itensDe(rec, confirmadas);
+  const itensHtml = its.length ? '<div class="itens">' + its.slice(0,4).map(x => '<div><b>Item ' + esc(x[0]) + '</b> · ' + esc(x[1]) + (x[2] ? ' · ' + esc(x[2]) + ' ' + esc(x[3]||"") : '') + (fmtValor(x[4]) ? ' · ' + esc(fmtValor(x[4])) : '') + '</div>').join("") + (its.length > 4 ? '<div>+ ' + (its.length-4) + ' item(ns)</div>' : '') + '</div>' : "";
+  return '<article class="'+cls.join(" ")+'" data-id="'+esc(rec.id)+'">'+
+    '<div class="top">'+pills.join("")+'<span class="days">'+esc(diasTxt)+'</span></div>'+
+    '<h3>'+esc(it.orgao_nome || "")+'</h3>'+
+    '<div class="meta">'+esc(it.municipio_nome)+'/'+esc(it.uf)+' · <span class="mono">'+rec.km.toLocaleString("pt-BR")+' km</span> · '+esc(it.modalidade_licitacao_nome||"")+' · encerra <span class="mono">'+esc(fmtData(rec.fim))+'</span>'+(it.unidade_nome && it.unidade_nome!==it.orgao_nome ? ' · '+esc(it.unidade_nome) : '')+'</div>'+
+    '<p class="obj">'+esc(obj)+'</p>'+ itensHtml +
+    '<div class="foot">'+
+      (valor ? '<span class="val">'+esc(valor)+'</span>' : '<span class="meta">valor não informado</span>')+
+      '<span class="meta">'+esc(plataforma(rec))+'</span>'+
+      '<a href="'+esc(linkPncp(rec))+'" target="_blank" rel="noopener">Edital no PNCP ↗</a>'+origem+
+      '<span class="sp"></span>'+
+      '<button class="mark int" type="button" data-act="interesse" aria-pressed="'+(m==="interesse")+'">★ Interesse</button>'+
+      '<button class="mark dis" type="button" data-act="descartado" aria-pressed="'+(m==="descartado")+'">✕ Descartar</button>'+
+    '</div></article>';
+}
+
+function render(){
+  const vis = visiveis();
+  const f = filtros();
+  const noRaio = [...items.values()].filter(r => passaUF(r, f) && elegiveis(r, f).length && marks[r.id] !== "descartado");
+  const tem = (r, pred) => elegiveis(r, f).some(pred);
+  $("#nTotal").textContent = noRaio.length;
+  $("#n7").textContent = noRaio.filter(r => { const d = diasAte(r.fim); return d !== null && d <= 7; }).length;
+  $("#nSeg").textContent = noRaio.filter(r => tem(r, c => CATS[c].grupo === "sophos")).length;
+  $("#nBackup").textContent = noRaio.filter(r => tem(r, c => c === "backup")).length;
+  $("#nM365").textContent = noRaio.filter(r => tem(r, c => c === "m365")).length;
+  $("#nSup").textContent = noRaio.filter(r => tem(r, c => c === "sup")).length;
+  $("#nLD").textContent = noRaio.filter(isLD).length;
+  const nInt = idsInteresse().length;
+  $("#nInt").textContent = nInt; $("#cInt").textContent = nInt;
+  const fortes = vis.filter(v => v.forte).length;
+  $("#countLbl").textContent = vis.length + " na lista" + (vis.length !== fortes ? " · " + fortes + " confirmados" : "");
+  $("#lista").innerHTML = vis.length ? vis.map(card).join("") : '<div class="empty">Nenhum edital aberto com esses filtros. Amplie o raio ou o alcance, ligue mais linhas ou marque "Mostrar possíveis".</div>';
+  carregarDetalhes(vis.map(v => v.rec));
+}
+
+let detRun = 0;
+async function carregarDetalhes(recs){
+  const falta = recs.filter(r => !details.has(r.id));
+  if(!falta.length) return;
+  const myRun = ++detRun;
+  await pool(falta.map(rec => async () => {
+    if(details.has(rec.id)) return;
+    const it = rec.it;
+    const r = await fetch(CONSULTA + it.orgao_cnpj + "/compras/" + it.ano + "/" + it.numero_sequencial);
+    details.set(rec.id, r.ok ? await r.json() : {});
+  }), 4);
+  if(myRun === detRun) render();
+}
+
+// ---- eventos
+function salvaChips(){
+  store.set("grupos", [...document.querySelectorAll(".chip[data-grupo][aria-pressed=true]")].map(b => b.dataset.grupo));
+  store.set("linhas", [...document.querySelectorAll(".chip[data-linha][aria-pressed=true]")].map(b => b.dataset.linha));
+}
+document.querySelectorAll(".chip").forEach(b => b.addEventListener("click", () => {
+  b.setAttribute("aria-pressed", b.getAttribute("aria-pressed") !== "true"); salvaChips(); render(); if(items.size) verificarItens();
+}));
+["#raioSup","#alcance","#uf"].forEach(s => $(s).addEventListener("change", () => { salvaFiltros(); render(); if(items.size) verificarItens(); }));
+$("#soInt").addEventListener("change", () => render());
+["#ordem","#fracos","#ocultarDesc","#soLD"].forEach(s => $(s).addEventListener("change", () => { salvaFiltros(); render(); }));
+function salvaFiltros(){ store.set("filtros", { raioSup:$("#raioSup").value, alcance:$("#alcance").value, uf:$("#uf").value, ordem:$("#ordem").value, fracos:$("#fracos").checked, soLD:$("#soLD").checked }); }
+$("#busca").addEventListener("input", () => render());
+$("#btnAtualizar").addEventListener("click", () => { itensCache = {}; store.set("itens", {}); buscar(); });
+$("#lista").addEventListener("click", e => {
+  const b = e.target.closest(".mark"); if(!b) return;
+  const id = b.closest(".ed").dataset.id; const act = b.dataset.act;
+  if(marks[id] === act) delete marks[id]; else marks[id] = act;
+  if(marks[id] === "interesse"){ const rec = items.get(id); if(rec) snaps[id] = snapshot(rec); }
+  else delete snaps[id];
+  store.set("marks", marks); store.set("snaps", snaps); render();
+});
+
+function linhas(){
+  return visiveis().map(({rec, forte, confirmadas}) => {
+    const it = rec.it, d = details.get(rec.id) || {};
+    const fa = filtros().ativas;
+    const frentes = forte ? confirmadas : [...rec.cats].filter(c => fa.has(c));
+    const viaObj = confirmadas.some(c => rec.strong.has(c)), viaIt = confirmadas.some(c => !rec.strong.has(c));
+    return {
+      relevancia: forte ? "confirmado" : "possível",
+      confirmado_em: forte ? (viaObj && viaIt ? "objeto+itens" : (viaObj ? "objeto" : "itens")) : "anexos",
+      frentes: frentes.map(nomeCat).join(", "),
+      orgao: it.orgao_nome || "", municipio: it.municipio_nome || "", uf: it.uf || "", km: rec.km,
+      modalidade: it.modalidade_licitacao_nome || "", objeto: (it.description || "").replace(/\s+/g," "),
+      itens_encontrados: itensDe(rec, confirmadas).map(itemTxt).join(" | "),
+      abertura: fmtData(rec.ini), encerramento: fmtData(rec.fim), dias: diasAte(rec.fim),
+      valor_estimado: d.valorTotalEstimado || it.valor_global || "", plataforma: plataforma(rec),
+      processo: d.processo || "", numero_compra: d.numeroCompra || "",
+      link_pncp: linkPncp(rec), link_origem: d.linkSistemaOrigem || "", controle_pncp: rec.id, marcacao: marks[rec.id] || ""
+    };
+  });
+}
+$("#btnCsv").addEventListener("click", () => {
+  const rows = linhas(); if(!rows.length){ toast("Nada para exportar"); return; }
+  const cols = Object.keys(rows[0]);
+  const cell = v => { const s = String(v==null?"":v); return /[;"\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s; };
+  const csv = "﻿" + cols.join(";") + "\n" + rows.map(r => cols.map(c => cell(r[c])).join(";")).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], {type:"text/csv;charset=utf-8"}));
+  a.download = "editais-nano-" + new Date().toISOString().slice(0,10) + ".csv";
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+});
+$("#btnZap").addEventListener("click", async () => {
+  const rows = linhas().filter(r => r.relevancia === "confirmado");
+  if(!rows.length){ toast("Nenhum edital confirmado na lista"); return; }
+  const txt = "*Editais abertos · Nano TI* (" + new Date().toLocaleDateString("pt-BR") + ")\n\n" + rows.map(r =>
+    "• *" + r.frentes + "* — " + r.orgao + " (" + r.municipio + "/" + r.uf + ", " + r.km + " km)\n  Encerra " + r.encerramento + (r.valor_estimado ? " · " + fmtValor(+r.valor_estimado) : "") + " · " + r.plataforma +
+    (r.itens_encontrados ? "\n  " + r.itens_encontrados.split(" | ")[0] : "") + "\n  " + r.link_pncp
+  ).join("\n\n");
+  try{ await navigator.clipboard.writeText(txt); toast("Copiado — cole no WhatsApp"); }
+  catch(e){ const ta=document.createElement("textarea"); ta.value=txt; document.body.appendChild(ta); ta.select(); try{ document.execCommand("copy"); toast("Copiado — cole no WhatsApp"); }catch(_){ toast("Não consegui copiar"); } ta.remove(); }
+});
+
+// filtros salvos
+const fs = store.get("filtros", null);
+if(fs){
+  if(fs.raioSup) $("#raioSup").value = fs.raioSup;
+  if(fs.alcance) $("#alcance").value = fs.alcance;
+  if(fs.ordem) $("#ordem").value = fs.ordem;
+  $("#fracos").checked = !!fs.fracos; $("#soLD").checked = !!fs.soLD;
+}
+catsAtivas();
+
+buscar().catch(e => { running=false; $("#btnAtualizar").disabled=false; setStatus("Falha ao consultar o PNCP: " + e.message); $("#lista").innerHTML = '<div class="empty">Não consegui falar com o PNCP. Confira a internet e clique em Atualizar.</div>'; });
+})();
+</script>
+</body>
+</html>
