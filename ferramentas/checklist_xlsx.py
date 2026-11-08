@@ -57,6 +57,8 @@ def situacao(doc, sessao, hoje):
             return "CONFERIR", emissao, "emitida em " + emissao.strftime("%d/%m/%Y") + "; confira o prazo de emissão aceito pelo edital"
         limite = emissao + dt.timedelta(days=int(dias))
         nota = "emitida em %s; o edital aceita até %s dias" % (emissao.strftime("%d/%m/%Y"), dias)
+    elif origem == "outros":
+        return "CONFERIR", None, "arquivo antigo de DOCUMENTOS NOVOS; confira se ainda vale"
     else:
         return "OK", None, ""
     if limite < hoje.date():
@@ -123,7 +125,7 @@ def gerar(spec, saida):
             pend.append("Renovar: %s (%s %s%s)" % (d.get("arquivo") or nome, "venceu" if st == "VENCIDA" else "vence", br(lim),
                                                     ", sessão " + br(sessao) if sessao and st != "VENCIDA" else ""))
         elif st == "CONFERIR":
-            pend.append("Conferir prazo: " + (d.get("arquivo") or nome))
+            pend.append("Conferir: " + (d.get("arquivo") or nome))
         r += 1
         vals = [n, d.get("grupo"), nome, d.get("item"), d.get("arquivo") or ("(emitir para este edital)" if st == "EMITIR" else ""), st, lim, obs, ""]
         for i, v in enumerate(vals, 1):
