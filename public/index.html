@@ -168,7 +168,7 @@ label.chk{display:flex;gap:.35rem;align-items:center;font-size:.85rem;color:var(
 
 <div class="verbar">
   <span class="tag">v6 · 08/11/2026</span>
-  <span>Pré-análise sob demanda: botão "🔍 Pedir pré-análise" no card; a rodada dos dias úteis (7h30 e 13h30) lê os documentos do PNCP e devolve a análise no próprio card.</span>
+  <span>Pré-análise sob demanda: botão "🔍 Pedir pré-análise" no card; a rodada dos dias úteis (7h06 e 13h06) lê os documentos do PNCP e devolve a análise no próprio card.</span>
   <span class="spacer"></span>
   <button class="btn-theme" id="themeBtn" type="button">Tema</button>
 </div>
@@ -445,8 +445,18 @@ async function carregarAnalises(){
     const j = await r.json(); analises = new Map((j.analises || []).map(a => [a.id, a]));
   }catch(e){}
 }
+const SLOTS_RODADA = [[7,6],[13,6]]; // dias úteis, horário de Brasília (tarefa agendada no Claude)
+function rodadaPerdida(pedidoIso){
+  // houve um horário de rodada depois do pedido, há mais de 90 min, e o pedido segue na fila?
+  const pedido = new Date(pedidoIso), agora = new Date();
+  for(let dia = new Date(pedido.getFullYear(), pedido.getMonth(), pedido.getDate()); dia <= agora; dia.setDate(dia.getDate() + 1)){
+    if(dia.getDay() === 0 || dia.getDay() === 6) continue;
+    for(const [h, m] of SLOTS_RODADA){ const t = new Date(dia); t.setHours(h, m, 0, 0); if(t > pedido && agora - t > 90 * 60000) return t; }
+  }
+  return null;
+}
 function proximaRodada(){
-  const d = new Date(); const slots = [[7,30],[13,30]];
+  const d = new Date(); const slots = SLOTS_RODADA;
   for(let i = 0; i < 8; i++){
     const dia = new Date(d.getFullYear(), d.getMonth(), d.getDate() + i);
     if(dia.getDay() === 0 || dia.getDay() === 6) continue;
@@ -514,7 +524,12 @@ function blocoAnalise(rec){
   const a = analises.get(rec.id);
   let h = '<div class="analise-linha">';
   if(!a) h += '<button class="mark" type="button" data-act="pedir">🔍 Pedir pré-análise</button>';
-  else if(a.status === "pendente") h += '<span class="pill">pré-análise na fila · ' + esc(fmtRodada(proximaRodada())) + '</span><button class="mark" type="button" data-act="cancelarAnalise">cancelar</button>';
+  else if(a.status === "pendente"){
+    const perdida = rodadaPerdida(a.pedido_em);
+    h += '<span class="pill">pré-análise na fila · ' + esc(fmtRodada(proximaRodada())) + '</span>' +
+         (perdida ? '<span class="pill warn">a rodada de ' + esc(perdida.toLocaleString("pt-BR", { weekday:"short", hour:"2-digit", minute:"2-digit" })) + ' não rodou</span><span class="meta">computador desligado, app do Claude fechado ou login do monitor expirado no navegador do app</span>' : '') +
+         '<button class="mark" type="button" data-act="cancelarAnalise">cancelar</button>';
+  }
   else if(a.status === "processando") h += '<span class="pill">analisando os documentos…</span>';
   else if(a.status === "erro") h += '<span class="pill warn">pré-análise falhou</span><span class="meta">' + esc((a.erro || "").slice(0, 160)) + '</span><button class="mark" type="button" data-act="pedir">tentar de novo</button>';
   else if(a.status === "pronta"){

@@ -25,7 +25,7 @@ Marcações de interesse e descarte (com motivo) ficam num banco D1 e alimentam 
 - `GET /api/pncp-proxy/...` — proxy só de leitura para itens e documentos do PNCP (download de PDF/ZIP sem CORS).
 
 ## Pré-análise
-O botão "🔍 Pedir pré-análise" no card coloca o edital na fila. A rodada agendada no Claude (dias úteis, 7h30 e 13h30, até 5 por rodada)
+O botão "🔍 Pedir pré-análise" no card coloca o edital na fila. A rodada agendada no Claude (dias úteis, 7h06 e 13h06, até 5 por rodada)
 abre o monitor no navegador do app e usa `window.nanoAnalise` (`fila`, `marcar`, `arquivos`, `itens`, `ler`, `detalhe`, `salvar`, `falhar`)
 para ler edital, TR e anexos (PDF, ZIP, DOCX), escrever a pré-análise e devolvê-la ao card.
 
