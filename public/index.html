@@ -128,6 +128,16 @@ label.chk{display:flex;gap:.35rem;align-items:center;font-size:.85rem;color:var(
 .ed .foot .sp{flex:1}
 .mark{font:inherit;font-size:.78rem;border:1px solid var(--border);background:var(--surface-2);color:var(--text-soft);border-radius:8px;padding:.2rem .55rem;cursor:pointer}
 .mark[aria-pressed="true"].int{background:var(--accent-lime-soft);color:var(--track-b-text);border-color:var(--accent-lime)}
+.mark.go{background:var(--accent-lime-soft);color:var(--track-b-text);border-color:var(--accent-lime);font-weight:600}
+.grp{font-family:Poppins,Inter,sans-serif;font-size:1rem;font-weight:600;margin:.9rem 0 .1rem;color:var(--text)}
+.grp:first-child{margin-top:0}
+.grp .n{font-family:"JetBrains Mono",monospace;font-size:.8rem;color:var(--text-faint);font-weight:500}
+.pill.etapa{background:var(--call-bg);color:var(--call-text)}
+.pill.etapa.e-ganhamos{background:var(--accent-lime);color:#0b1d33}
+.pill.etapa.e-perdemos,.pill.etapa.e-desistimos{background:var(--surface-2);color:var(--text-soft)}
+.ed.won{border-color:var(--accent-lime)}
+.analise-linha.pipe a{font-weight:600}
+.pend{margin:.45rem 0 0;padding-left:1.1rem;font-size:.8rem;color:var(--text-soft);display:grid;gap:.15rem}
 .motivos{margin-top:.7rem;border-top:1px dashed var(--border);padding-top:.7rem;display:grid;gap:.5rem}
 .motivos .q{font-size:.82rem;font-weight:600;color:var(--text)}
 .motivos .opts{display:flex;flex-wrap:wrap;gap:.35rem}
@@ -167,8 +177,8 @@ label.chk{display:flex;gap:.35rem;align-items:center;font-size:.85rem;color:var(
 <div class="wrap">
 
 <div class="verbar">
-  <span class="tag">v6 · 08/11/2026</span>
-  <span>Pré-análise sob demanda: botão "🔍 Pedir pré-análise" no card; a rodada dos dias úteis (7h06 e 13h06) lê os documentos do PNCP e devolve a análise no próprio card.</span>
+  <span class="tag">v7 · 08/11/2026</span>
+  <span>Pipeline: "✅ Vamos participar" no card leva o edital para a aba Pipeline; a rodada seguinte (7h06/13h06) cria a pasta no SharePoint, copia os documentos da pasta-mestre e monta o checklist. Depois: Proposta enviada → Ganhamos / Perdemos / Desistimos.</span>
   <span class="spacer"></span>
   <button class="btn-theme" id="themeBtn" type="button">Tema</button>
 </div>
@@ -241,6 +251,7 @@ label.chk{display:flex;gap:.35rem;align-items:center;font-size:.85rem;color:var(
   <ul>
     <li><b>Confirmado no objeto</b> ou <b>nos itens</b> (o card mostra o item). <b>Possível</b>: o termo só aparece nos anexos; fica oculto por padrão.</li>
     <li><b>Suporte de TI</b> só até o raio escolhido; <b>Sophos, backup e Microsoft</b> no Brasil todo.</li>
+    <li><b>✅ Vamos participar</b> leva o edital para a aba <b>Pipeline</b>. Na rodada seguinte, o Claude cria a pasta em LICITACOES 2026, copia a habilitação da pasta-mestre (DOCUMENTOS PADRAO - HABILITACAO), faz a análise completa e monta o checklist em Excel, com a validade de cada certidão comparada com a data da sessão.</li>
     <li><b>★ Interesse</b> e <b>✕ Descartar</b> (com motivo) vão para as abas próprias e valem no celular e no computador. Com algumas marcações, o monitor passa a sinalizar o que <b>parece interesse</b> e o que <b>parece descarte</b>; a aba <b>O que aprendi</b> mostra por quê.</li>
   </ul>
 </div>
@@ -248,6 +259,7 @@ label.chk{display:flex;gap:.35rem;align-items:center;font-size:.85rem;color:var(
 <div class="tabs" role="tablist">
   <button class="tab" role="tab" data-aba="abertos" aria-selected="true" type="button">Abertos<span class="n" id="tAb"></span></button>
   <button class="tab" role="tab" data-aba="interesse" aria-selected="false" type="button">★ Interesse<span class="n" id="tInt"></span></button>
+  <button class="tab" role="tab" data-aba="pipeline" aria-selected="false" type="button">✅ Pipeline<span class="n" id="tPipe"></span></button>
   <button class="tab" role="tab" data-aba="descartados" aria-selected="false" type="button">✕ Descartados<span class="n" id="tDesc"></span></button>
   <button class="tab" role="tab" data-aba="aprendizado" aria-selected="false" type="button">O que aprendi</button>
 </div>
@@ -352,6 +364,20 @@ let pendentes = new Set(store.get("pendentes", []));
 let apiOk = false;
 let servidorIds = new Set();
 
+// ---- pipeline (participações): id -> {etapa, pasta_status, pasta_url, checklist_url, resumo, arquivar, snap…}
+const ETAPAS = [
+  ["participar", "Vamos participar"],
+  ["proposta", "Proposta enviada"],
+  ["ganhamos", "Ganhamos"],
+  ["perdemos", "Perdemos"],
+  ["desistimos", "Desistimos"]
+];
+const nomeEtapa = e => (ETAPAS.find(x => x[0] === e) || [e, e])[1];
+const ATIVAS = new Set(["participar", "proposta"]);
+let particip = new Map();
+let abrirResultado = null;   // {id, etapa}: perguntando se arquiva a pasta
+let confirmarTirar = null;   // id aguardando confirmação para sair do pipeline
+
 const MOTIVOS = [
   ["escopo", "Fora do nosso escopo"],
   ["erp", "Sistema de gestão / software específico"],
@@ -380,7 +406,7 @@ function deSnap(s){
            n: norm(((s.it||{}).title||"") + " " + ((s.it||{}).description||"")), cats: new Set(s.cats || []), strong: new Set(s.so || []),
            strongItens: new Set(s.si || []), itens: s.itens, _snap: true, _valor: s.valor, _origem: s.origem };
 }
-const recById = id => items.get(id) || (snaps[id] ? deSnap(snaps[id]) : null);
+const recById = id => items.get(id) || (snaps[id] ? deSnap(snaps[id]) : ((particip.get(id) || {}).snap ? deSnap(particip.get(id).snap) : null));
 function salvaLocal(){ store.set("marks", marks); store.set("motivos", motivos); store.set("snaps", snaps); store.set("pendentes", [...pendentes]); }
 
 function atualizaSync(){
@@ -429,7 +455,7 @@ async function carregarServidor(){
     salvaLocal(); store.set("migrado", true);
     atualizaSync();
     for(const id of subir) await enviar(id);
-    await carregarAnalises();
+    await Promise.all([carregarAnalises(), carregarParticipacoes()]);
   }catch(e){ apiOk = false; atualizaSync(); }
 }
 
@@ -498,6 +524,101 @@ async function abrirAnalise(id){
   }
   render();
 }
+// ---- pipeline: mover de etapa; a pasta no SharePoint e o checklist saem na rodada agendada
+async function carregarParticipacoes(){
+  if(!API || !apiOk) return;
+  try{
+    const r = await fetchT("/api/participacoes", { cache:"no-store" }, 15000);
+    if(!r.ok) return;
+    const j = await r.json(); particip = new Map((j.participacoes || []).map(p => [p.id, p]));
+  }catch(e){}
+}
+async function moverEtapa(id, etapa, arquivar){
+  if(!API || !apiOk){ toast("O pipeline precisa da conexão com o banco do monitor"); return; }
+  const atual = particip.get(id);
+  const rec = recById(id);
+  const snap = atual ? null : (snaps[id] || (rec ? snapshot(rec) : null));
+  // entrar no pipeline também marca interesse (aprendizado + cópia do edital)
+  if(!atual && marks[id] !== "interesse") marcar(id, "interesse");
+  try{
+    const r = await fetchT("/api/participacoes/" + encodeURIComponent(id), { method:"PUT", headers:{"content-type":"application/json"},
+      body: JSON.stringify({ etapa, snap, arquivar: arquivar === undefined ? null : arquivar }) }, 15000);
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    const j = await r.json(); const agora = new Date().toISOString();
+    const novo = { ...(atual || { id, criado_em: agora, snap }), etapa, pasta_status: j.pasta_status, arquivar: j.arquivar, atualizado_em: agora };
+    if(j.pasta_status === "pendente" && (!atual || atual.pasta_status !== "pendente")){ novo.pasta_pedida_em = agora; novo.erro = null; }
+    particip.set(id, novo);
+    abrirResultado = null; confirmarTirar = null; render();
+    if(!atual) toast("No pipeline · pasta e checklist na rodada de " + fmtRodada(proximaRodada()));
+    else toast(nomeEtapa(etapa) + (j.arquivar === "pendente" ? " · a pasta vai para ARQUIVADOS na próxima rodada" : ""));
+  }catch(e){ toast("Não consegui mover agora. Tente de novo."); }
+}
+async function pedirPasta(id){
+  try{
+    const r = await fetchT("/api/participacoes/" + encodeURIComponent(id) + "/pasta", { method:"POST" }, 15000);
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    const p = particip.get(id); if(p){ p.pasta_status = "pendente"; p.pasta_pedida_em = new Date().toISOString(); p.erro = null; }
+    render(); toast("Checklist na fila · rodada de " + fmtRodada(proximaRodada()));
+  }catch(e){ toast("Não consegui pedir agora. Tente de novo."); }
+}
+async function tirarDoPipeline(id){
+  try{
+    const r = await fetchT("/api/participacoes/" + encodeURIComponent(id), { method:"DELETE" }, 15000);
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    particip.delete(id); confirmarTirar = null; render();
+    toast("Saiu do pipeline (a pasta no SharePoint continua lá)");
+  }catch(e){ toast("Não consegui tirar agora"); }
+}
+function blocoPipeline(rec){
+  const p = particip.get(rec.id); if(!p) return "";
+  let h = '<div class="analise-linha pipe">';
+  if(p.pasta_status === "pendente"){
+    const perdida = p.pasta_pedida_em ? rodadaPerdida(p.pasta_pedida_em) : null;
+    h += '<span class="pill">pasta e checklist na fila · ' + esc(fmtRodada(proximaRodada())) + '</span>' +
+         (perdida ? '<span class="pill warn">a rodada de ' + esc(perdida.toLocaleString("pt-BR", { weekday:"short", hour:"2-digit", minute:"2-digit" })) + ' não rodou</span>' : '');
+  }
+  else if(p.pasta_status === "criando") h += '<span class="pill">criando a pasta e o checklist…</span>';
+  else if(p.pasta_status === "erro") h += '<span class="pill warn">pasta/checklist falhou</span><span class="meta">' + esc((p.erro || "").slice(0, 160)) + '</span><button class="mark" type="button" data-act="pedirPasta">tentar de novo</button>';
+  else if(p.pasta_status === "pronta"){
+    const rz = p.resumo || {};
+    if(p.pasta_url) h += '<a href="' + esc(p.pasta_url) + '" target="_blank" rel="noopener">📁 Pasta no SharePoint ↗</a>';
+    if(p.checklist_url) h += '<a href="' + esc(p.checklist_url) + '" target="_blank" rel="noopener">📋 Checklist ↗</a>';
+    if(ATIVAS.has(p.etapa)){
+    if(rz.ok != null) h += '<span class="pill ok">' + rz.ok + ' ok</span>';
+    if(rz.emitir) h += '<span class="pill">' + rz.emitir + ' a emitir</span>';
+    if(rz.falta) h += '<span class="pill warn">' + rz.falta + ' faltando</span>';
+    const venc = (rz.vencidos || 0) + (rz.vence_antes || 0);
+    if(venc) h += '<span class="pill warn">' + venc + ' vencido(s) na sessão</span>';
+    if(rz.conferir) h += '<span class="pill ghost">' + rz.conferir + ' conferir</span>';
+    h += '<button class="mark" type="button" data-act="pedirPasta">refazer checklist</button>';
+    }
+  }
+  if(p.arquivar === "pendente") h += '<span class="pill">vai para ARQUIVADOS na próxima rodada</span>';
+  else if(p.arquivar === "feito") h += '<span class="pill ghost">pasta arquivada</span>';
+  else if(p.arquivar === "erro") h += '<span class="pill warn">não consegui arquivar a pasta</span><span class="meta">' + esc((p.erro || "").slice(0, 120)) + '</span>';
+  h += '</div>';
+  const pend = (p.resumo && p.resumo.pendencias) || [];
+  if(p.pasta_status === "pronta" && ATIVAS.has(p.etapa) && pend.length)
+    h += '<ul class="pend">' + pend.slice(0, 6).map(x => '<li>' + esc(x) + '</li>').join("") + (pend.length > 6 ? '<li>+ ' + (pend.length - 6) + ' no checklist</li>' : '') + '</ul>';
+  return h;
+}
+function botoesPipeline(p){
+  const e = (et, txt, cls) => '<button class="mark' + (cls ? " " + cls : "") + '" type="button" data-act="etapa" data-etapa="' + et + '">' + txt + '</button>';
+  const tirar = confirmarTirar === p.id
+    ? '<button class="mark dis" type="button" data-act="tirarSim">confirmar: tirar do pipeline</button>'
+    : '<button class="mark" type="button" data-act="tirar">tirar do pipeline</button>';
+  if(p.etapa === "participar") return e("proposta", "📨 Proposta enviada", "go") + e("desistimos", "Desistimos") + tirar;
+  if(p.etapa === "proposta") return e("ganhamos", "🏆 Ganhamos", "go") + e("perdemos", "Perdemos") + e("desistimos", "Desistimos") + e("participar", "↩ voltar");
+  const arquivavel = p.etapa !== "ganhamos" && (p.pasta_url || p.pasta_id) && !p.arquivar;
+  return e("proposta", "↩ reabrir") + (arquivavel ? '<button class="mark" type="button" data-act="arquivar">📦 Arquivar pasta</button>' : '') + tirar;
+}
+function painelResultado(id, etapa){
+  return '<div class="motivos"><div class="q">' + (etapa === "perdemos" ? "Perdemos." : "Desistimos.") + ' Mover a pasta desta licitação para ARQUIVADOS?</div>' +
+    '<div class="opts"><button class="mark go" type="button" data-act="resSim">Sim, mover na próxima rodada</button>' +
+    '<button class="mark" type="button" data-act="resNao">Não, deixar onde está</button>' +
+    '<button class="mark" type="button" data-act="resCancelar">Cancelar</button></div></div>';
+}
+
 // markdown simples -> HTML (títulos, listas, tabelas, negrito, links)
 function md(src){
   const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
@@ -805,6 +926,7 @@ function listaMarcadas(acao, f){
   const out = [];
   for(const [id, m] of Object.entries(marks)){
     if(m !== acao) continue;
+    if(acao === "interesse" && particip.has(id)) continue;   // já está no pipeline
     const rec = recById(id); if(!rec) continue;
     if(!passaTexto(rec, f.q)) continue;
     out.push({ rec, forte: true, confirmadas: [...conf(rec)], p: null });
@@ -813,8 +935,22 @@ function listaMarcadas(acao, f){
   return out;
 }
 const idsCom = acao => Object.keys(marks).filter(id => marks[id] === acao && recById(id));
+const ordemEtapa = Object.fromEntries(ETAPAS.map((e, i) => [e[0], Math.min(i, 2)]));
+function listaPipeline(f){
+  const out = [];
+  for(const [id, p] of particip){
+    const rec = recById(id); if(!rec) continue;
+    if(!passaTexto(rec, f.q)) continue;
+    out.push({ rec, forte: true, confirmadas: [...conf(rec)], p: null, etapa: p.etapa });
+  }
+  const quando = v => String((particip.get(v.rec.id) || {}).atualizado_em || "");
+  out.sort((a, b) => (ordemEtapa[a.etapa] - ordemEtapa[b.etapa]) ||
+    (ATIVAS.has(a.etapa) ? prazoDe(a.rec) - prazoDe(b.rec) : quando(b).localeCompare(quando(a))));
+  return out;
+}
 function visiveis(){
   const f = filtros();
+  if(aba === "pipeline") return listaPipeline(f);
   if(aba === "interesse") return listaMarcadas("interesse", f);
   if(aba === "descartados") return listaMarcadas("descartado", f);
   if(aba === "aprendizado") return [];
@@ -846,9 +982,15 @@ function card(v){
   const dias = diasAte(rec.fim);
   const marca = marks[rec.id] || "";
   const encerrado = rec.fim && rec.fim.getTime() < Date.now();
-  const cls = ["ed"]; if(!forte) cls.push("weak"); if(marca === "descartado") cls.push("disc");
+  const part = particip.get(rec.id);
+  const naPipe = aba === "pipeline" && part;
+  const cls = ["ed"]; if(!forte) cls.push("weak");
+  if(naPipe && (part.etapa === "perdemos" || part.etapa === "desistimos")) cls.push("disc");
+  else if(naPipe && part.etapa === "ganhamos") cls.push("won");
+  else if(marca === "descartado") cls.push("disc");
   else if(!encerrado && dias !== null && dias <= 3) cls.push("urg"); else if(!encerrado && dias !== null && dias <= 7) cls.push("soon");
   const pills = [];
+  if(part) pills.push('<span class="pill etapa e-' + esc(part.etapa) + '">' + (naPipe ? "" : "pipeline · ") + esc(nomeEtapa(part.etapa)) + '</span>');
   if(!marca && !firstVisit && !prevSeen.has(rec.id) && !rec._snap) pills.push('<span class="pill new">novo</span>');
   for(const c of confirmadas) pills.push('<span class="pill">' + esc(nomeCat(c)) + (rec.strong.has(c) ? "" : ' <small>· nos itens</small>') + '</span>');
   if(!forte){ const ff = filtros(); for(const c of rec.cats) if(ff.ativas.has(c) && dentro(rec, c, ff)) pills.push('<span class="pill ghost">possível · ' + esc(nomeCat(c)) + '</span>'); }
@@ -865,10 +1007,13 @@ function card(v){
   const itensHtml = its.length ? '<div class="itens">' + its.slice(0,4).map(x => '<div><b>Item ' + esc(x[0]) + '</b> · ' + esc(x[1]) + (x[2] ? ' · ' + esc(x[2]) + ' ' + esc(x[3]||"") : '') + (fmtValor(x[4]) ? ' · ' + esc(fmtValor(x[4])) : '') + '</div>').join("") + (its.length > 4 ? '<div>+ ' + (its.length-4) + ' item(ns)</div>' : '') + '</div>' : "";
   const mo = motivos[rec.id];
   const motivoHtml = marca === "descartado" ? '<div class="motivo-lido">✕ ' + esc(nomeMotivo(mo && mo.m)) + (mo && mo.obs ? ' — ' + esc(mo.obs) : '') + '</div>' : "";
-  const botoes = marca === "descartado"
+  const botoes = naPipe ? botoesPipeline(part)
+    : marca === "descartado"
     ? '<button class="mark" type="button" data-act="restaurar">↩ Restaurar</button>'
     : '<button class="mark int" type="button" data-act="interesse" aria-pressed="'+(marca==="interesse")+'">★ Interesse</button>' +
-      '<button class="mark dis" type="button" data-act="descartar">✕ Descartar</button>';
+      (part ? '<button class="mark" type="button" data-act="irPipeline">ver no pipeline</button>'
+            : (API ? '<button class="mark go" type="button" data-act="participar">✅ Vamos participar</button>' : '') +
+              '<button class="mark dis" type="button" data-act="descartar">✕ Descartar</button>');
   return '<article class="'+cls.join(" ")+'" data-id="'+esc(rec.id)+'">'+
     '<div class="top">'+pills.join("")+'<span class="days">'+esc(diasTxt)+'</span></div>'+
     '<h3>'+esc(it.orgao_nome || "")+'</h3>'+
@@ -879,7 +1024,9 @@ function card(v){
       '<span class="meta">'+esc(plataforma(rec))+'</span>'+
       '<a href="'+esc(linkPncp(rec))+'" target="_blank" rel="noopener">Edital no PNCP ↗</a>'+origem+
       '<span class="sp"></span>'+ botoes +
-    '</div>' + (marca !== "descartado" ? blocoAnalise(rec) : '') + (abrirMotivo === rec.id ? painelMotivo(rec.id) : '') + '</article>';
+    '</div>' + (naPipe ? blocoPipeline(rec) : '') + (marca !== "descartado" || naPipe ? blocoAnalise(rec) : '') +
+    (abrirMotivo === rec.id ? painelMotivo(rec.id) : '') +
+    (naPipe && abrirResultado && abrirResultado.id === rec.id ? painelResultado(rec.id, abrirResultado.etapa) : '') + '</article>';
 }
 
 function painelAprendizado(){
@@ -922,8 +1069,10 @@ function render(){
   $("#nSup").textContent = noRaio.filter(v => tem(v.rec, c => c === "sup")).length;
   $("#nLD").textContent = noRaio.filter(v => isLD(v.rec)).length;
   const nInt = idsCom("interesse").length, nDesc = idsCom("descartado").length;
+  const nTriagem = idsCom("interesse").filter(id => !particip.has(id)).length;
+  const nPipe = [...particip.values()].filter(p => ATIVAS.has(p.etapa)).length;
   $("#nInt").textContent = nInt;
-  $("#tAb").textContent = abertos.length; $("#tInt").textContent = nInt; $("#tDesc").textContent = nDesc;
+  $("#tAb").textContent = abertos.length; $("#tInt").textContent = nTriagem; $("#tDesc").textContent = nDesc; $("#tPipe").textContent = nPipe;
   document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", t.dataset.aba === aba));
   if(aba === "aprendizado"){
     $("#countLbl").textContent = "";
@@ -932,11 +1081,25 @@ function render(){
   }
   const vis = aba === "abertos" ? abertos : visiveis();
   const fortes = vis.filter(v => v.forte).length;
-  $("#countLbl").textContent = vis.length + (aba === "abertos" ? " na lista" + (vis.length !== fortes ? " · " + fortes + " confirmados" : "") : (aba === "interesse" ? " com interesse" : " descartados"));
+  if(aba === "pipeline"){
+    const and = vis.filter(v => ATIVAS.has(v.etapa)).length;
+    $("#countLbl").textContent = and + " em andamento · " + (vis.length - and) + " com resultado";
+  }
+  else $("#countLbl").textContent = vis.length + (aba === "abertos" ? " na lista" + (vis.length !== fortes ? " · " + fortes + " confirmados" : "") : (aba === "interesse" ? " com interesse" : " descartados"));
   const vazio = aba === "interesse" ? "Nenhum edital marcado com ★ Interesse ainda."
               : aba === "descartados" ? "Nenhum edital descartado ainda."
+              : aba === "pipeline" ? "Nada no pipeline ainda. Num edital de Abertos ou ★ Interesse, clique em ✅ Vamos participar: a rodada seguinte cria a pasta no SharePoint, copia os documentos da pasta-mestre e monta o checklist."
               : "Nenhum edital aberto com esses filtros. Amplie o raio ou o alcance, ligue mais linhas ou marque \"Mostrar possíveis\".";
-  $("#lista").innerHTML = vis.length ? vis.map(card).join("") : '<div class="empty">' + vazio + '</div>';
+  let html = "";
+  if(aba === "pipeline"){
+    const titulos = ["Vamos participar", "Proposta enviada", "Resultado"]; let g = -1;
+    for(const v of vis){
+      const gi = ordemEtapa[v.etapa];
+      if(gi !== g){ g = gi; html += '<h2 class="grp">' + titulos[gi] + ' <span class="n">' + vis.filter(x => ordemEtapa[x.etapa] === gi).length + '</span></h2>'; }
+      html += card(v);
+    }
+  } else html = vis.map(card).join("");
+  $("#lista").innerHTML = vis.length ? html : '<div class="empty">' + vazio + '</div>';
   carregarDetalhes(vis.slice(0, 120).map(v => v.rec).filter(r => !r._snap));
 }
 
@@ -987,6 +1150,21 @@ $("#lista").addEventListener("click", e => {
   else if(act === "descartar"){ abrirMotivo = abrirMotivo === id ? null : id; render(); const inp = document.querySelector('.ed[data-id="' + CSS.escape(id) + '"] .obs-in'); if(inp) inp.focus({preventScroll:true}); }
   else if(act === "cancelar"){ abrirMotivo = null; render(); }
   else if(act === "restaurar"){ marcar(id, null); toast("Restaurado para os abertos"); }
+  else if(act === "participar") moverEtapa(id, "participar");
+  else if(act === "irPipeline"){ aba = "pipeline"; abrirMotivo = null; render(); window.scrollTo({ top: $(".tabs").offsetTop - 10 }); }
+  else if(act === "etapa"){
+    const et = b.dataset.etapa, p = particip.get(id);
+    // perdeu/desistiu com pasta já criada: pergunta se arquiva
+    if((et === "perdemos" || et === "desistimos") && p && (p.pasta_url || p.pasta_id || p.pasta_status === "pendente" || p.pasta_status === "criando")){ abrirResultado = { id, etapa: et }; render(); }
+    else moverEtapa(id, et);
+  }
+  else if(act === "resSim" && abrirResultado) moverEtapa(id, abrirResultado.etapa, true);
+  else if(act === "resNao" && abrirResultado) moverEtapa(id, abrirResultado.etapa, false);
+  else if(act === "resCancelar"){ abrirResultado = null; render(); }
+  else if(act === "arquivar"){ const p = particip.get(id); if(p) moverEtapa(id, p.etapa, true); }
+  else if(act === "pedirPasta") pedirPasta(id);
+  else if(act === "tirar"){ confirmarTirar = id; render(); }
+  else if(act === "tirarSim") tirarDoPipeline(id);
   else if(act === "pedir") pedirAnalise(id);
   else if(act === "cancelarAnalise") cancelarAnalise(id);
   else if(act === "verAnalise") abrirAnalise(id);
@@ -999,7 +1177,7 @@ $("#lista").addEventListener("keydown", e => {
 });
 
 // ---- eventos
-document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => { aba = t.dataset.aba; abrirMotivo = null; render(); }));
+document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => { aba = t.dataset.aba; abrirMotivo = null; abrirResultado = null; confirmarTirar = null; render(); }));
 function salvaChips(){
   store.set("grupos", [...document.querySelectorAll(".chip[data-grupo][aria-pressed=true]")].map(b => b.dataset.grupo));
   store.set("linhas", [...document.querySelectorAll(".chip[data-linha][aria-pressed=true]")].map(b => b.dataset.linha));
@@ -1031,7 +1209,8 @@ function linhas(){
       valor_estimado: d.valorTotalEstimado || it.valor_global || rec._valor || "", plataforma: plataforma(rec),
       processo: d.processo || "", numero_compra: d.numeroCompra || "",
       link_pncp: linkPncp(rec), link_origem: d.linkSistemaOrigem || rec._origem || "", controle_pncp: rec.id,
-      marcacao: marks[rec.id] || "", motivo: marks[rec.id] === "descartado" ? nomeMotivo(mo.m) : "", obs: mo.obs || "",
+      marcacao: marks[rec.id] || "", etapa_pipeline: particip.has(rec.id) ? nomeEtapa(particip.get(rec.id).etapa) : "",
+      pasta_sharepoint: (particip.get(rec.id) || {}).pasta_url || "", motivo: marks[rec.id] === "descartado" ? nomeMotivo(mo.m) : "", obs: mo.obs || "",
       pontuacao_aprendida: p == null ? "" : Math.round(p * 100) + "%"
     };
   });
@@ -1049,9 +1228,9 @@ $("#btnCsv").addEventListener("click", () => {
 $("#btnZap").addEventListener("click", async () => {
   const rows = linhas().filter(r => r.relevancia === "confirmado");
   if(!rows.length){ toast("Nenhum edital confirmado na lista"); return; }
-  const titulo = aba === "interesse" ? "Editais com interesse" : aba === "descartados" ? "Editais descartados" : "Editais abertos";
+  const titulo = aba === "pipeline" ? "Pipeline de licitações" : aba === "interesse" ? "Editais com interesse" : aba === "descartados" ? "Editais descartados" : "Editais abertos";
   const txt = "*" + titulo + " · Nano TI* (" + new Date().toLocaleDateString("pt-BR") + ")\n\n" + rows.map(r =>
-    "• *" + r.frentes + "* — " + r.orgao + " (" + r.municipio + "/" + r.uf + ", " + r.km + " km)\n  Encerra " + r.encerramento + (r.valor_estimado ? " · " + fmtValor(+r.valor_estimado) : "") + " · " + r.plataforma +
+    "• " + (r.etapa_pipeline ? "[" + r.etapa_pipeline + "] " : "") + "*" + r.frentes + "* — " + r.orgao + " (" + r.municipio + "/" + r.uf + ", " + r.km + " km)\n  Encerra " + r.encerramento + (r.valor_estimado ? " · " + fmtValor(+r.valor_estimado) : "") + " · " + r.plataforma +
     (r.motivo ? "\n  Motivo: " + r.motivo + (r.obs ? " — " + r.obs : "") : "") +
     (r.itens_encontrados ? "\n  " + r.itens_encontrados.split(" | ")[0] : "") + "\n  " + r.link_pncp
   ).join("\n\n");
@@ -1127,19 +1306,45 @@ async function extrair(buf, nome){
   if(/\.txt$/i.test(nome || "")) return { tipo:"txt", texto: new TextDecoder().decode(buf) };
   return { tipo:"desconhecido (" + magic.replace(/[^\x20-\x7e]/g, "?") + ")", texto:"" };
 }
+function dadosSnap(id, snap){
+  const it = (snap && snap.it) || {};
+  return { id, orgao: it.orgao_nome, unidade: it.unidade_nome, municipio: it.municipio_nome, uf: it.uf, km: snap && snap.km,
+           objeto: (it.description || it.title || "").replace(/^\[[^\]]+\]\s*-\s*/, ""), encerramento: snap && snap.fim, plataforma: it.usuario_nome,
+           valor_estimado: snap && snap.valor, link_pncp: "https://pncp.gov.br/app/editais" + String(it.item_url || "").replace(/^\/compras/, ""),
+           link_origem: snap && snap.origem, itens_encontrados: snap && snap.itens };
+}
+// nome da pasta no padrão da Nano: "ÓRGÃO-UF - MODALIDADE Nº 011.2026 - PROCESSO 022.2026"
+function nomePastaDe(det, it){
+  det = det || {}; it = it || {};
+  const semAcento = s => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  let org = semAcento((det.orgaoEntidade && det.orgaoEntidade.razaoSocial) || it.orgao_nome || "ORGAO").toUpperCase().replace(/\s+/g, " ").trim();
+  org = org.replace(/^MUNICIPIO (D[EOA]S?) /, "PREFEITURA $1 ");
+  const uf = ((det.unidadeOrgao && det.unidadeOrgao.ufSigla) || it.uf || "").toUpperCase();
+  const mn = semAcento(det.modalidadeNome || it.modalidade_licitacao_nome || "").toLowerCase();
+  const mod = /preg/.test(mn) ? "PREGÃO" : /dispensa/.test(mn) ? "DISPENSA" : /concorr/.test(mn) ? "CONCORRÊNCIA" : /inexig/.test(mn) ? "INEXIGIBILIDADE"
+            : /credenc/.test(mn) ? "CREDENCIAMENTO" : /leil/.test(mn) ? "LEILÃO" : (det.modalidadeNome || "COMPRA").toUpperCase();
+  const ano = String(det.anoCompra || it.ano || new Date().getFullYear());
+  const num = String(det.numeroCompra || it.numero_sequencial || "").replace(/\/\d{4}$/, "").trim();
+  const proc = String(det.processo || "").trim().replace(/\//g, ".");
+  let nome = org + (uf && !org.endsWith("-" + uf) ? "-" + uf : "") + " - " + mod + (num ? " Nº " + num + "." + ano : "") + (proc ? " - PROCESSO " + proc : "");
+  nome = nome.replace(/[\\/:*?"<>|#%]/g, "-").replace(/\s+/g, " ").replace(/[. ]+$/, "").trim();
+  return nome.length > 180 ? nome.slice(0, 180).trim() : nome;
+}
+async function apiPart(caminho, metodo, corpo){
+  const r = await fetchT("/api/participacoes" + caminho, { method: metodo || "GET", cache:"no-store",
+    headers: corpo ? {"content-type":"application/json"} : undefined, body: corpo ? JSON.stringify(corpo) : undefined }, 20000);
+  if(!r.ok) throw new Error("participacoes" + caminho + " respondeu " + r.status + ": " + await r.text());
+  return r.json();
+}
 window.nanoAnalise = {
-  versao: 1,
+  versao: 2,
   async fila(){
     const r = await fetchT("/api/analises", { cache:"no-store" }, 20000);
     if(!r.ok) throw new Error("API de análises respondeu " + r.status);
     const j = await r.json();
     return (j.analises || []).filter(a => a.status === "pendente").map(a => {
       if(a.snap) filaSnaps.set(a.id, a.snap);
-      const it = (a.snap && a.snap.it) || {};
-      return { id:a.id, pedido_em:a.pedido_em, orgao:it.orgao_nome, unidade:it.unidade_nome, municipio:it.municipio_nome, uf:it.uf, km:a.snap && a.snap.km,
-               objeto:(it.description || it.title || "").replace(/^\[[^\]]+\]\s*-\s*/, ""), encerramento:a.snap && a.snap.fim, plataforma:it.usuario_nome,
-               valor_estimado:a.snap && a.snap.valor, link_pncp: "https://pncp.gov.br/app/editais" + String(it.item_url || "").replace(/^\/compras/, ""),
-               link_origem: a.snap && a.snap.origem, itens_encontrados: a.snap && a.snap.itens };
+      return { ...dadosSnap(a.id, a.snap), pedido_em: a.pedido_em };
     });
   },
   async marcar(id, status, extra){
@@ -1179,7 +1384,53 @@ window.nanoAnalise = {
              inicio: ini, fim, proximo: fim < d.texto.length ? fim : null, texto: d.texto.slice(ini, fim) };
   },
   async salvar(id, resultado, resumo){ await this.marcar(id, "pronta", { resultado, resumo }); analises.set(id, { id, status:"pronta", resumo }); analiseTexto.set(id, resultado); render(); return true; },
-  async falhar(id, erro){ await this.marcar(id, "erro", { erro: String(erro).slice(0, 1500) }); return true; }
+  async falhar(id, erro){ await this.marcar(id, "erro", { erro: String(erro).slice(0, 1500) }); return true; },
+
+  // ---- pipeline: pasta no SharePoint + checklist (rodada agendada)
+  // Fluxo: pastasPendentes() -> pasta(id,"criando") -> nomePasta(id) / preAnalise(id) / arquivos / itens / ler
+  //        -> (SharePoint e planilha fora daqui) -> pastaCriada(id, {pasta_url, pasta_id, checklist_url, resumo}) | pastaFalhou(id, erro)
+  async pastasPendentes(){
+    const j = await apiPart("");
+    let an = new Map();
+    try{ const ra = await fetchT("/api/analises", { cache:"no-store" }, 20000); if(ra.ok) an = new Map(((await ra.json()).analises || []).map(a => [a.id, a])); }catch(e){}
+    return (j.participacoes || []).filter(p => p.pasta_status === "pendente")
+      .sort((a, b) => String(a.pasta_pedida_em).localeCompare(String(b.pasta_pedida_em)))
+      .map(p => {
+        if(p.snap) filaSnaps.set(p.id, p.snap);
+        return { ...dadosSnap(p.id, p.snap), etapa: p.etapa, pasta_pedida_em: p.pasta_pedida_em,
+                 pasta_existente: (p.pasta_id || p.pasta_url) ? { id: p.pasta_id, url: p.pasta_url, checklist_url: p.checklist_url } : null,
+                 pre_analise: an.has(p.id) ? an.get(p.id).status : null };
+      });
+  },
+  async nomePasta(id){
+    const s = filaSnaps.get(id) || snaps[id] || (particip.get(id) || {}).snap || {};
+    const det = await this.detalhe(id);
+    return { nome: nomePastaDe(det && !det.erro ? det : null, s.it), numero_compra: det && det.numeroCompra, processo: det && det.processo, modalidade: det && det.modalidadeNome };
+  },
+  async preAnalise(id){
+    const r = await fetchT("/api/analises/" + encodeURIComponent(id), { cache:"no-store" }, 20000);
+    if(r.status === 404) return null;
+    if(!r.ok) throw new Error("análise respondeu " + r.status);
+    const a = await r.json(); return { status: a.status, resumo: a.resumo, resultado: a.resultado };
+  },
+  async pasta(id, status, extra){ await apiPart("/" + encodeURIComponent(id) + "/pasta", "PUT", { pasta_status: status, ...(extra || {}) }); return true; },
+  async pastaCriada(id, dados){
+    const d = dados || {};
+    await this.pasta(id, "pronta", { pasta_url: d.pasta_url, pasta_id: d.pasta_id, checklist_url: d.checklist_url, resumo: d.resumo, erro: null });
+    const p = particip.get(id); if(p) Object.assign(p, { pasta_status: "pronta", pasta_url: d.pasta_url || p.pasta_url, pasta_id: d.pasta_id || p.pasta_id, checklist_url: d.checklist_url || p.checklist_url, resumo: d.resumo || p.resumo, erro: null });
+    render(); return true;
+  },
+  async pastaFalhou(id, erro){
+    await this.pasta(id, "erro", { erro: String(erro).slice(0, 1500) });
+    const p = particip.get(id); if(p){ p.pasta_status = "erro"; p.erro = String(erro); } render(); return true;
+  },
+  async arquivarPendentes(){
+    const j = await apiPart("");
+    return (j.participacoes || []).filter(p => p.arquivar === "pendente")
+      .map(p => ({ id: p.id, etapa: p.etapa, orgao: ((p.snap || {}).it || {}).orgao_nome, pasta_id: p.pasta_id, pasta_url: p.pasta_url }));
+  },
+  async arquivoFeito(id, pasta_url){ await apiPart("/" + encodeURIComponent(id) + "/arquivo", "PUT", { status: "feito", pasta_url: pasta_url || null }); const p = particip.get(id); if(p){ p.arquivar = "feito"; if(pasta_url) p.pasta_url = pasta_url; } render(); return true; },
+  async arquivoFalhou(id, erro){ await apiPart("/" + encodeURIComponent(id) + "/arquivo", "PUT", { status: "erro", erro: String(erro).slice(0, 1500) }); return true; }
 };
 
 carregarServidor().then(() => { treinar(); render(); });

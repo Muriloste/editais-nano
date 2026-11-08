@@ -41,8 +41,33 @@ const SCHEMA = [
      resumo TEXT,
      resultado TEXT,
      erro TEXT
+   )`,
+  // pipeline: participar -> proposta -> ganhamos | perdemos | desistimos
+  // pasta_status: pendente -> criando -> pronta | erro (pasta no SharePoint + checklist, feita pela rodada agendada)
+  // arquivar: pendente -> feito | erro (mover a pasta para ARQUIVADOS)
+  `CREATE TABLE IF NOT EXISTS participacoes (
+     id TEXT PRIMARY KEY,
+     etapa TEXT NOT NULL,
+     snap TEXT,
+     obs TEXT,
+     pasta_status TEXT,
+     pasta_url TEXT,
+     pasta_id TEXT,
+     checklist_url TEXT,
+     resumo TEXT,
+     erro TEXT,
+     arquivar TEXT,
+     criado_em TEXT NOT NULL,
+     atualizado_em TEXT NOT NULL,
+     pasta_pedida_em TEXT,
+     pasta_concluida_em TEXT
    )`
 ];
+
+const ETAPAS = new Set(["participar", "proposta", "ganhamos", "perdemos", "desistimos"]);
+const STATUS_PASTA = new Set(["pendente", "criando", "pronta", "erro"]);
+const parseJ = (s) => { try { return s ? JSON.parse(s) : null; } catch { return null; } };
+const linhaPart = (r) => ({ ...r, snap: parseJ(r.snap), resumo: parseJ(r.resumo) });
 
 // Proxy só de leitura para os documentos e itens do PNCP (evita CORS ao baixar PDFs/ZIPs no navegador)
 const PNCP_PERMITIDO = /^(api\/pncp\/v1\/orgaos\/\d{14}\/compras\/\d{4}\/\d+(\/arquivos(\/\d+)?|\/itens)?|api\/consulta\/v1\/orgaos\/\d{14}\/compras\/\d{4}\/\d+|pncp-api\/v1\/orgaos\/\d{14}\/compras\/\d{4}\/\d+\/arquivos(\/\d+)?)$/;
@@ -120,12 +145,14 @@ export default {
         if (raw.length > 400000) return json({ erro: "resultado grande demais" }, 413);
         let b; try { b = JSON.parse(raw); } catch { return json({ erro: "json inválido" }, 400); }
         if (!b || !STATUS_ANALISE.has(b.status)) return json({ erro: "status inválido" }, 400);
+        // upsert: a rodada do pipeline grava a análise completa mesmo sem pedido de pré-análise
         await env.DB.prepare(
-          `UPDATE analises SET status = ?2,
+          `INSERT INTO analises (id, status, pedido_em, iniciado_em, concluido_em, resumo, resultado, erro)
+           VALUES (?1, ?2, ?3, CASE WHEN ?2 = 'processando' THEN ?3 END, CASE WHEN ?2 IN ('pronta', 'erro') THEN ?3 END, ?4, ?5, ?6)
+           ON CONFLICT(id) DO UPDATE SET status = ?2,
              iniciado_em = CASE WHEN ?2 = 'processando' THEN ?3 ELSE iniciado_em END,
              concluido_em = CASE WHEN ?2 IN ('pronta', 'erro') THEN ?3 ELSE concluido_em END,
-             resumo = COALESCE(?4, resumo), resultado = COALESCE(?5, resultado), erro = ?6
-           WHERE id = ?1`
+             resumo = COALESCE(?4, resumo), resultado = COALESCE(?5, resultado), erro = ?6`
         ).bind(aid, b.status, agoraA, b.resumo ? JSON.stringify(b.resumo) : null, texto(b.resultado, 380000), texto(b.erro, 2000)).run();
         return json({ ok: true });
       }
@@ -134,6 +161,98 @@ export default {
         return json({ ok: true });
       }
       return json({ erro: "método não permitido" }, 405);
+    }
+
+    // ---- pipeline de participação
+    const mp = url.pathname.match(/^\/api\/participacoes(?:\/([^/]+)(?:\/(pasta|arquivo))?)?$/);
+    if (mp) {
+      const pid = mp[1] ? decodeURIComponent(mp[1]) : null;
+      const sub = mp[2] || null;
+      if (pid && pid.length > 120) return json({ erro: "id inválido" }, 400);
+      const agoraP = new Date().toISOString();
+      const ler = async () => {
+        const raw = await request.text();
+        if (raw.length > 120000) throw Object.assign(new Error("registro grande demais"), { st: 413 });
+        try { return raw ? JSON.parse(raw) : {}; } catch { throw Object.assign(new Error("json inválido"), { st: 400 }); }
+      };
+      try {
+        if (request.method === "GET" && !pid) {
+          const { results } = await env.DB.prepare("SELECT * FROM participacoes ORDER BY criado_em").all();
+          return json({ participacoes: results.map(linhaPart) });
+        }
+        if (request.method === "GET" && pid && !sub) {
+          const r = await env.DB.prepare("SELECT * FROM participacoes WHERE id = ?1").bind(pid).first();
+          return r ? json(linhaPart(r)) : json({ erro: "não encontrada" }, 404);
+        }
+        // tela: mover de etapa (cria a linha na primeira vez)
+        if (request.method === "PUT" && pid && !sub) {
+          const b = await ler();
+          if (!ETAPAS.has(b.etapa)) return json({ erro: "etapa inválida" }, 400);
+          const atual = await env.DB.prepare("SELECT * FROM participacoes WHERE id = ?1").bind(pid).first();
+          const snap = b.snap && typeof b.snap === "object" ? JSON.stringify(b.snap).slice(0, 60000) : null;
+          // a pasta é pedida na primeira vez que entra em "participar" (ou se a anterior falhou)
+          let pastaStatus = atual ? atual.pasta_status : null;
+          let pastaPedida = atual ? atual.pasta_pedida_em : null;
+          if (b.etapa === "participar" && (!pastaStatus || pastaStatus === "erro")) { pastaStatus = "pendente"; pastaPedida = agoraP; }
+          let arquivar = atual ? atual.arquivar : null;
+          if (b.etapa === "perdemos" || b.etapa === "desistimos") {
+            if (b.arquivar === true && arquivar !== "feito") arquivar = "pendente";
+            if (b.arquivar === false && arquivar === "pendente") arquivar = null;
+          } else if (arquivar === "pendente") arquivar = null;
+          await env.DB.batch([
+            env.DB.prepare(
+              `INSERT INTO participacoes (id, etapa, snap, obs, pasta_status, arquivar, criado_em, atualizado_em, pasta_pedida_em)
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7, ?8)
+               ON CONFLICT(id) DO UPDATE SET etapa = ?2, snap = COALESCE(?3, snap), obs = COALESCE(?4, obs),
+                 pasta_status = ?5, arquivar = ?6, atualizado_em = ?7, pasta_pedida_em = ?8,
+                 erro = CASE WHEN ?5 = 'pendente' THEN NULL ELSE erro END`
+            ).bind(pid, b.etapa, snap, texto(b.obs, 1000), pastaStatus, arquivar, agoraP, pastaPedida),
+            env.DB.prepare("INSERT INTO historico (id, acao, obs, em) VALUES (?1, ?2, ?3, ?4)")
+              .bind(pid, "etapa:" + b.etapa, texto(b.obs, 500), agoraP)
+          ]);
+          return json({ ok: true, pasta_status: pastaStatus, arquivar });
+        }
+        // tela: pedir de novo a pasta/checklist
+        if (request.method === "POST" && pid && sub === "pasta") {
+          const r = await env.DB.prepare(
+            "UPDATE participacoes SET pasta_status = 'pendente', pasta_pedida_em = ?2, erro = NULL, atualizado_em = ?2 WHERE id = ?1"
+          ).bind(pid, agoraP).run();
+          return r.meta.changes ? json({ ok: true }) : json({ erro: "não está no pipeline" }, 404);
+        }
+        // rodada agendada: andamento da pasta
+        if (request.method === "PUT" && pid && sub === "pasta") {
+          const b = await ler();
+          if (!STATUS_PASTA.has(b.pasta_status)) return json({ erro: "pasta_status inválido" }, 400);
+          const r = await env.DB.prepare(
+            `UPDATE participacoes SET pasta_status = ?2, pasta_url = COALESCE(?3, pasta_url), pasta_id = COALESCE(?4, pasta_id),
+               checklist_url = COALESCE(?5, checklist_url), resumo = COALESCE(?6, resumo), erro = ?7, atualizado_em = ?8,
+               pasta_concluida_em = CASE WHEN ?2 IN ('pronta', 'erro') THEN ?8 ELSE pasta_concluida_em END
+             WHERE id = ?1`
+          ).bind(pid, b.pasta_status, texto(b.pasta_url, 1000), texto(b.pasta_id, 200), texto(b.checklist_url, 1000),
+                 b.resumo ? JSON.stringify(b.resumo).slice(0, 20000) : null, texto(b.erro, 2000), agoraP).run();
+          return r.meta.changes ? json({ ok: true }) : json({ erro: "não está no pipeline" }, 404);
+        }
+        // rodada agendada: pasta movida para ARQUIVADOS
+        if (request.method === "PUT" && pid && sub === "arquivo") {
+          const b = await ler();
+          if (!["feito", "erro"].includes(b.status)) return json({ erro: "status deve ser feito ou erro" }, 400);
+          const r = await env.DB.prepare(
+            "UPDATE participacoes SET arquivar = ?2, pasta_url = COALESCE(?3, pasta_url), erro = ?4, atualizado_em = ?5 WHERE id = ?1"
+          ).bind(pid, b.status, texto(b.pasta_url, 1000), b.status === "erro" ? texto(b.erro, 2000) : null, agoraP).run();
+          return r.meta.changes ? json({ ok: true }) : json({ erro: "não está no pipeline" }, 404);
+        }
+        if (request.method === "DELETE" && pid && !sub) {
+          await env.DB.batch([
+            env.DB.prepare("DELETE FROM participacoes WHERE id = ?1").bind(pid),
+            env.DB.prepare("INSERT INTO historico (id, acao, em) VALUES (?1, 'etapa:removido', ?2)").bind(pid, agoraP)
+          ]);
+          return json({ ok: true });
+        }
+        return json({ erro: "método não permitido" }, 405);
+      } catch (e) {
+        if (e.st) return json({ erro: e.message }, e.st);
+        throw e;
+      }
     }
 
     // histórico completo de decisões (para revisão)
