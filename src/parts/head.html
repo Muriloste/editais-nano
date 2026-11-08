@@ -128,6 +128,18 @@ label.chk{display:flex;gap:.35rem;align-items:center;font-size:.85rem;color:var(
 .ed .foot .sp{flex:1}
 .mark{font:inherit;font-size:.78rem;border:1px solid var(--border);background:var(--surface-2);color:var(--text-soft);border-radius:8px;padding:.2rem .55rem;cursor:pointer}
 .mark[aria-pressed="true"].int{background:var(--accent-lime-soft);color:var(--track-b-text);border-color:var(--accent-lime)}
+.aviso-docs{margin:1rem 0 0;border:1px solid var(--border);border-left:5px solid var(--accent-lime);border-radius:14px;background:var(--surface);padding:.8rem 1.1rem;box-shadow:var(--shadow);font-size:.88rem}
+.aviso-docs.amber{border-left-color:var(--amber);background:var(--amber-soft)}
+.aviso-docs.red{border-left-color:var(--warn);background:var(--warn-soft)}
+.aviso-docs .t{font-family:Poppins,Inter,sans-serif;font-weight:600;font-size:.95rem;color:var(--text)}
+.aviso-docs.amber .t{color:var(--amber)}
+.aviso-docs.red .t{color:var(--warn)}
+.aviso-docs ul{margin:.45rem 0 .35rem;padding-left:1.1rem;display:grid;gap:.2rem;color:var(--text)}
+.aviso-docs .mono{font-family:"JetBrains Mono",monospace;font-variant-numeric:tabular-nums}
+.aviso-docs .tag-r{color:var(--warn);font-weight:600}
+.aviso-docs .tag-a{color:var(--amber);font-weight:600}
+.aviso-docs .rod{font-size:.78rem;color:var(--text-soft)}
+.aviso-docs.ok{display:flex;flex-wrap:wrap;gap:.3rem .8rem;align-items:center;padding:.55rem 1rem}
 .mark.go{background:var(--accent-lime-soft);color:var(--track-b-text);border-color:var(--accent-lime);font-weight:600}
 .grp{font-family:Poppins,Inter,sans-serif;font-size:1rem;font-weight:600;margin:.9rem 0 .1rem;color:var(--text)}
 .grp:first-child{margin-top:0}
@@ -177,8 +189,8 @@ label.chk{display:flex;gap:.35rem;align-items:center;font-size:.85rem;color:var(
 <div class="wrap">
 
 <div class="verbar">
-  <span class="tag">v7 · 08/11/2026</span>
-  <span>Pipeline: "✅ Vamos participar" no card leva o edital para a aba Pipeline; a rodada seguinte (7h06/13h06) cria a pasta no SharePoint, copia os documentos da pasta-mestre e monta o checklist. Depois: Proposta enviada → Ganhamos / Perdemos / Desistimos.</span>
+  <span class="tag">v7.1 · 08/11/2026</span>
+  <span>Novo: aviso de certidões vencidas ou perto de vencer na pasta-mestre (lido a cada rodada). Pipeline: "✅ Vamos participar" no card leva o edital para a aba Pipeline; a rodada seguinte (7h06/13h06) cria a pasta no SharePoint, copia os documentos da pasta-mestre e monta o checklist. Depois: Proposta enviada → Ganhamos / Perdemos / Desistimos.</span>
   <span class="spacer"></span>
   <button class="btn-theme" id="themeBtn" type="button">Tema</button>
 </div>
@@ -198,6 +210,8 @@ label.chk{display:flex;gap:.35rem;align-items:center;font-size:.85rem;color:var(
     <div class="hot"><b id="nInt">–</b><span>★ Interesse</span></div>
   </div>
 </header>
+
+<section class="aviso-docs" id="avisoDocs" hidden aria-live="polite"></section>
 
 <section class="controls" aria-label="Filtros">
   <div class="row">

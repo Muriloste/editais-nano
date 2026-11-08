@@ -26,6 +26,7 @@ Marcações de interesse e descarte (com motivo) ficam num banco D1 e alimentam 
   `PUT` recebe `{etapa, snap, obs, arquivar}`; a primeira entrada em `participar` pede a pasta (`pasta_status = pendente`).
 - `POST /api/participacoes/:id/pasta` — pede a pasta/checklist de novo; `PUT .../pasta` — a rodada grava `{pasta_status, pasta_url, pasta_id, checklist_url, resumo, erro}`.
 - `PUT /api/participacoes/:id/arquivo` — a rodada informa `{status: feito|erro, pasta_url}` depois de mover a pasta para ARQUIVADOS.
+- `GET|PUT /api/docs-mestre` — nomes dos arquivos da pasta-mestre (`{nomes, pasta_url}`), gravados pela rodada com `nanoAnalise.documentos(nomes)`; a página lê `(val …)`/`(emitida …)` e mostra o aviso de certidões.
 - `GET /api/pncp-proxy/...` — proxy só de leitura para itens e documentos do PNCP (download de PDF/ZIP sem CORS).
 
 ## Pré-análise

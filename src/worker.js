@@ -61,6 +61,12 @@ const SCHEMA = [
      atualizado_em TEXT NOT NULL,
      pasta_pedida_em TEXT,
      pasta_concluida_em TEXT
+   )`,
+  // ajustes gerais (ex.: "docs_mestre" = nomes dos arquivos da pasta-mestre de habilitação, lidos pela rodada)
+  `CREATE TABLE IF NOT EXISTS ajustes (
+     chave TEXT PRIMARY KEY,
+     valor TEXT,
+     atualizado_em TEXT NOT NULL
    )`
 ];
 
@@ -159,6 +165,28 @@ export default {
       if (request.method === "DELETE" && aid) {
         await env.DB.prepare("DELETE FROM analises WHERE id = ?1").bind(aid).run();
         return json({ ok: true });
+      }
+      return json({ erro: "método não permitido" }, 405);
+    }
+
+    // ---- documentos da pasta-mestre (a rodada grava os nomes; a página calcula validade e avisos)
+    if (url.pathname === "/api/docs-mestre") {
+      if (request.method === "GET") {
+        const r = await env.DB.prepare("SELECT valor, atualizado_em FROM ajustes WHERE chave = 'docs_mestre'").first();
+        const v = r ? parseJ(r.valor) || {} : {};
+        return json({ nomes: v.nomes || [], pasta_url: v.pasta_url || null, atualizado_em: r ? r.atualizado_em : null });
+      }
+      if (request.method === "PUT") {
+        const raw = await request.text();
+        if (raw.length > 60000) return json({ erro: "lista grande demais" }, 413);
+        let b; try { b = JSON.parse(raw); } catch { return json({ erro: "json inválido" }, 400); }
+        if (!b || !Array.isArray(b.nomes)) return json({ erro: "envie {nomes: [...]}" }, 400);
+        const nomes = b.nomes.filter((n) => typeof n === "string").slice(0, 300).map((n) => n.slice(0, 300));
+        await env.DB.prepare(
+          `INSERT INTO ajustes (chave, valor, atualizado_em) VALUES ('docs_mestre', ?1, ?2)
+           ON CONFLICT(chave) DO UPDATE SET valor = ?1, atualizado_em = ?2`
+        ).bind(JSON.stringify({ nomes, pasta_url: texto(b.pasta_url, 1000) }), new Date().toISOString()).run();
+        return json({ ok: true, total: nomes.length });
       }
       return json({ erro: "método não permitido" }, 405);
     }

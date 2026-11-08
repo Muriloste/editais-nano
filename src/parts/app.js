@@ -112,7 +112,7 @@ async function carregarServidor(){
     salvaLocal(); store.set("migrado", true);
     atualizaSync();
     for(const id of subir) await enviar(id);
-    await Promise.all([carregarAnalises(), carregarParticipacoes()]);
+    await Promise.all([carregarAnalises(), carregarParticipacoes(), carregarDocsMestre()]);
   }catch(e){ apiOk = false; atualizaSync(); }
 }
 
@@ -274,6 +274,67 @@ function painelResultado(id, etapa){
     '<div class="opts"><button class="mark go" type="button" data-act="resSim">Sim, mover na próxima rodada</button>' +
     '<button class="mark" type="button" data-act="resNao">Não, deixar onde está</button>' +
     '<button class="mark" type="button" data-act="resCancelar">Cancelar</button></div></div>';
+}
+
+// ---- aviso de certidões da pasta-mestre (a rodada agendada grava os nomes dos arquivos)
+const PASTA_MESTRE_URL = "https://nanosolucoesti.sharepoint.com/Documentos%20Compartilhados/NANO/LICITACOES/DOCUMENTOS%20PADRAO%20-%20HABILITACAO";
+const DIAS_AVISO_VAL = 15;              // validade: avisa com 15 dias de antecedência
+const IDADE_AVISO = 50, IDADE_RUIM = 90; // "(emitida …)": editais costumam aceitar 60 ou 90 dias
+let docsMestre = null;
+async function carregarDocsMestre(){
+  if(!API || !apiOk) return;
+  try{ const r = await fetchT("/api/docs-mestre", { cache:"no-store" }, 15000); if(r.ok) docsMestre = await r.json(); }catch(e){}
+}
+const fmtDia = d => d.toLocaleDateString("pt-BR", { day:"2-digit", month:"2-digit", year:"numeric" });
+function situacaoDocs(){
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  const out = [];
+  for(const nome of (docsMestre && docsMestre.nomes) || []){
+    const m = nome.match(/\(val (\d{2})-(\d{2})-(\d{4})\)/i), e = nome.match(/\(emitida (\d{2})-(\d{2})-(\d{4})\)/i);
+    if(!m && !e) continue;
+    const rotulo = nome.replace(/\.[a-z0-9]{2,4}$/i, "").replace(/\s*\((val|emitida) [^)]*\)/i, "").replace(/^\d+[a-z]?\s*-\s*/i, "").trim();
+    const x = m || e; const d = new Date(+x[3], +x[2] - 1, +x[1]);
+    if(m){ const dias = Math.round((d - hoje) / 86400000); out.push({ nome, rotulo, tipo:"val", data:d, dias, nivel: dias < 0 ? 2 : dias <= DIAS_AVISO_VAL ? 1 : 0 }); }
+    else { const idade = Math.round((hoje - d) / 86400000); out.push({ nome, rotulo, tipo:"emitida", data:d, idade, nivel: idade >= IDADE_RUIM ? 2 : idade >= IDADE_AVISO ? 1 : 0 }); }
+  }
+  return out;
+}
+function avisoDocs(){
+  const el = $("#avisoDocs"); if(!el) return;
+  if(!API || !apiOk || !docsMestre || !docsMestre.atualizado_em){ el.hidden = true; return; }
+  const docs = situacaoDocs();
+  const conferido = docsMestre.atualizado_em ? new Date(docsMestre.atualizado_em).toLocaleString("pt-BR", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" }) : null;
+  const pasta = '<a href="' + esc(docsMestre.pasta_url || PASTA_MESTRE_URL) + '" target="_blank" rel="noopener">Pasta-mestre ↗</a>';
+  const rod = '<span class="rod">' + (conferido ? "conferido em " + esc(conferido) + " (rodada automática)" : "ainda não conferido pela rodada") + '</span>';
+  el.hidden = false;
+  if(!docs.length){ el.className = "aviso-docs ok"; el.innerHTML = '<span class="t">Certidões da pasta-mestre</span><span>nenhum arquivo com "(val …)" ou "(emitida …)" no nome</span>' + pasta + rod; return; }
+  // sessões do pipeline em andamento, para cruzar com as validades
+  const sessoes = [...particip.values()].filter(p => ATIVAS.has(p.etapa) && p.snap && p.snap.fim)
+    .map(p => ({ fim: new Date(p.snap.fim), orgao: ((p.snap.it || {}).orgao_nome || "").trim() })).filter(s => s.fim > new Date());
+  const ruins = docs.filter(d => d.nivel > 0).sort((a, b) => (b.nivel - a.nivel) || (a.data - b.data));
+  const afeta = d => d.tipo === "val" && d.dias >= 0 ? sessoes.filter(s => d.data < s.fim) : [];
+  const extra = docs.filter(d => d.nivel === 0 && afeta(d).length);
+  if(!ruins.length && !extra.length){
+    const prox = docs.filter(d => d.tipo === "val").sort((a, b) => a.data - b.data)[0];
+    el.className = "aviso-docs ok";
+    el.innerHTML = '<span class="t">✓ Certidões da pasta-mestre em dia</span>' + (prox ? '<span>próximo vencimento: <b>' + esc(prox.rotulo) + '</b> em <span class="mono">' + esc(fmtDia(prox.data)) + '</span></span>' : '') + pasta + rod;
+    return;
+  }
+  const nV = docs.filter(d => d.nivel === 2).length, nA = docs.filter(d => d.nivel === 1).length;
+  el.className = "aviso-docs " + (nV ? "red" : "amber");
+  const linha = d => {
+    let t;
+    if(d.tipo === "val") t = d.dias < 0 ? '<span class="tag-r">vencida</span> desde <span class="mono">' + esc(fmtDia(d.data)) + '</span>'
+                          : (d.dias === 0 ? '<span class="tag-a">vence hoje</span>' : (d.nivel ? '<span class="tag-a">vence em ' + d.dias + (d.dias === 1 ? ' dia' : ' dias') + '</span>' : 'vale até')) + ' (<span class="mono">' + esc(fmtDia(d.data)) + '</span>)';
+    else t = '<span class="' + (d.nivel === 2 ? "tag-r" : "tag-a") + '">emitida há ' + d.idade + ' dias</span> (<span class="mono">' + esc(fmtDia(d.data)) + '</span>) · editais costumam aceitar até 60 ou 90 dias';
+    const s = afeta(d);
+    if(s.length) t += ' · <b>antes da sessão</b> de ' + s.slice(0, 2).map(x => esc(x.orgao) + ' (' + esc(fmtDia(x.fim).slice(0, 5)) + ')').join(", ") + (s.length > 2 ? ' e mais ' + (s.length - 2) : '');
+    return '<li><b>' + esc(d.rotulo) + '</b> — ' + t + '</li>';
+  };
+  const partes = []; if(nV) partes.push(nV + (nV === 1 ? " vencida" : " vencidas")); if(nA) partes.push(nA + " perto de vencer"); if(extra.length) partes.push(extra.length + " vence antes de sessão do pipeline");
+  el.innerHTML = '<div class="t">⚠ Certidões da pasta-mestre: ' + esc(partes.join(" · ")) + '</div>' +
+    '<ul>' + ruins.concat(extra).map(linha).join("") + '</ul>' +
+    '<div class="rod">Renove, suba na pasta-mestre com a nova data no nome, ex. <span class="mono">10 - CRF FGTS (val DD-MM-AAAA).pdf</span>, e apague a antiga. ' + pasta + ' · ' + (conferido ? "conferido em " + esc(conferido) + " (rodada automática)" : "") + '</div>';
 }
 
 // markdown simples -> HTML (títulos, listas, tabelas, negrito, links)
@@ -731,6 +792,7 @@ function render(){
   $("#nInt").textContent = nInt;
   $("#tAb").textContent = abertos.length; $("#tInt").textContent = nTriagem; $("#tDesc").textContent = nDesc; $("#tPipe").textContent = nPipe;
   document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", t.dataset.aba === aba));
+  avisoDocs();
   if(aba === "aprendizado"){
     $("#countLbl").textContent = "";
     $("#lista").innerHTML = painelAprendizado();
@@ -994,7 +1056,7 @@ async function apiPart(caminho, metodo, corpo){
   return r.json();
 }
 window.nanoAnalise = {
-  versao: 2,
+  versao: 3,
   async fila(){
     const r = await fetchT("/api/analises", { cache:"no-store" }, 20000);
     if(!r.ok) throw new Error("API de análises respondeu " + r.status);
@@ -1087,6 +1149,13 @@ window.nanoAnalise = {
       .map(p => ({ id: p.id, etapa: p.etapa, orgao: ((p.snap || {}).it || {}).orgao_nome, pasta_id: p.pasta_id, pasta_url: p.pasta_url }));
   },
   async arquivoFeito(id, pasta_url){ await apiPart("/" + encodeURIComponent(id) + "/arquivo", "PUT", { status: "feito", pasta_url: pasta_url || null }); const p = particip.get(id); if(p){ p.arquivar = "feito"; if(pasta_url) p.pasta_url = pasta_url; } render(); return true; },
+  // nomes dos arquivos da raiz da pasta-mestre (a página calcula as validades e mostra o aviso)
+  async documentos(nomes, pasta_url){
+    const r = await fetchT("/api/docs-mestre", { method:"PUT", headers:{"content-type":"application/json"}, body: JSON.stringify({ nomes, pasta_url: pasta_url || null }) }, 20000);
+    if(!r.ok) throw new Error("docs-mestre respondeu " + r.status + ": " + await r.text());
+    await carregarDocsMestre(); render();
+    return situacaoDocs().filter(d => d.nivel > 0).map(d => d.rotulo + (d.tipo === "val" ? (d.dias < 0 ? " — vencida" : " — vence em " + d.dias + " dias") : " — emitida há " + d.idade + " dias"));
+  },
   async arquivoFalhou(id, erro){ await apiPart("/" + encodeURIComponent(id) + "/arquivo", "PUT", { status: "erro", erro: String(erro).slice(0, 1500) }); return true; }
 };
 
