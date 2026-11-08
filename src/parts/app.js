@@ -165,7 +165,7 @@ async function pedirAnalise(id){
     if(!r.ok) throw new Error("HTTP " + r.status);
     analises.set(id, { id, status:"pendente", pedido_em: new Date().toISOString() });
     analiseTexto.delete(id); analiseAberta.delete(id);
-    render(); toast("Pré-análise na fila · próxima rodada " + fmtRodada(proximaRodada()));
+    render(); toast("Pré-análise na fila (" + fmtRodada(proximaRodada()) + ") · o edital está na aba Interesse");
   }catch(e){ toast("Não consegui pedir a pré-análise. Tente de novo."); }
 }
 async function cancelarAnalise(id){
@@ -206,7 +206,7 @@ async function moverEtapa(id, etapa, arquivar){
     if(j.pasta_status === "pendente" && (!atual || atual.pasta_status !== "pendente")){ novo.pasta_pedida_em = agora; novo.erro = null; }
     particip.set(id, novo);
     abrirResultado = null; confirmarTirar = null; render();
-    if(!atual) toast("No pipeline · pasta e checklist na rodada de " + fmtRodada(proximaRodada()));
+    if(!atual) toast("Foi para a aba Pipeline · pasta e checklist na rodada de " + fmtRodada(proximaRodada()));
     else toast(nomeEtapa(etapa) + (j.arquivar === "pendente" ? " · a pasta vai para ARQUIVADOS na próxima rodada" : ""));
   }catch(e){ toast("Não consegui mover agora. Tente de novo."); }
 }
@@ -622,10 +622,13 @@ function preencheUFs(){
 }
 const prazoDe = r => r.fim ? r.fim.getTime() : 9e15;
 
-function listaAbertos(f){
+// Abertos = só o que ainda não foi triado: ao marcar Interesse, Vamos participar ou Descartar, o edital sai daqui e vai para a aba dele.
+// Com {todos:true} (números do topo) entram também os triados, menos os descartados.
+function listaAbertos(f, todos){
   const out = [];
   for(const rec of items.values()){
     if(marks[rec.id] === "descartado") continue;
+    if(!todos && (marks[rec.id] === "interesse" || particip.has(rec.id))) continue;
     if(!passaUF(rec, f)) continue;
     const confirmadas = elegiveis(rec, f);
     const forte = confirmadas.length > 0;
@@ -780,7 +783,7 @@ function painelAprendizado(){
 function render(){
   const f = filtros();
   const abertos = listaAbertos(f);
-  const noRaio = abertos.filter(v => v.forte);
+  const noRaio = listaAbertos(f, true).filter(v => v.forte);
   const tem = (r, pred) => elegiveis(r, f).some(pred);
   $("#nTotal").textContent = noRaio.length;
   $("#n7").textContent = noRaio.filter(v => { const d = diasAte(v.rec.fim); return d !== null && d <= 7; }).length;
@@ -868,7 +871,7 @@ function confirmarDescarte(id){
   const mot = motivoEscolhido || "outro";
   abrirMotivo = null; motivoEscolhido = null; delete rascunhoObs[id];
   marcar(id, "descartado", mot, obs);
-  toast("Descartado: " + nomeMotivo(mot));
+  toast("Descartado (" + nomeMotivo(mot) + ") · foi para a aba Descartados");
 }
 $("#lista").addEventListener("click", e => {
   const card = e.target.closest(".ed"); if(!card) return;
@@ -883,11 +886,14 @@ $("#lista").addEventListener("click", e => {
   }
   const b = e.target.closest(".mark"); if(!b) return;
   const act = b.dataset.act;
-  if(act === "interesse"){ marcar(id, marks[id] === "interesse" ? null : "interesse"); toast(marks[id] ? "★ Marcado com interesse" : "Interesse removido"); }
+  if(act === "interesse"){
+    marcar(id, marks[id] === "interesse" ? null : "interesse");
+    toast(marks[id] ? "★ Foi para a aba Interesse" : (particip.has(id) ? "Interesse removido" : "Interesse removido · voltou para Abertos"));
+  }
   else if(act === "confirmarDescarte") confirmarDescarte(id);
   else if(act === "descartar"){ abrirMotivo = abrirMotivo === id ? null : id; motivoEscolhido = null; render(); const inp = document.querySelector('.ed[data-id="' + CSS.escape(id) + '"] .obs-in'); if(inp) inp.focus({preventScroll:true}); }
   else if(act === "cancelar"){ delete rascunhoObs[id]; abrirMotivo = null; motivoEscolhido = null; render(); }
-  else if(act === "restaurar"){ marcar(id, null); toast("Restaurado para os abertos"); }
+  else if(act === "restaurar"){ marcar(id, null); toast("Voltou para Abertos"); }
   else if(act === "participar") moverEtapa(id, "participar");
   else if(act === "irPipeline"){ aba = "pipeline"; abrirMotivo = null; render(); window.scrollTo({ top: $(".tabs").offsetTop - 10 }); }
   else if(act === "etapa"){
