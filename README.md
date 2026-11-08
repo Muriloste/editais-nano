@@ -21,6 +21,13 @@ Marcações de interesse e descarte (com motivo) ficam num banco D1 e alimentam 
 - `PUT /api/marcas/:id` — grava `{acao, motivo, obs, frentes, snap}`.
 - `DELETE /api/marcas/:id` — remove a marcação (fica no histórico como `removido`).
 - `GET /api/historico` — todas as decisões, em ordem, para revisar as buscas.
+- `GET /api/analises` · `GET|POST|PUT|DELETE /api/analises/:id` — fila de pré-análise (`pendente` → `processando` → `pronta` | `erro`), com resultado em markdown e resumo.
+- `GET /api/pncp-proxy/...` — proxy só de leitura para itens e documentos do PNCP (download de PDF/ZIP sem CORS).
+
+## Pré-análise
+O botão "🔍 Pedir pré-análise" no card coloca o edital na fila. A rodada agendada no Claude (dias úteis, 7h30 e 13h30, até 5 por rodada)
+abre o monitor no navegador do app e usa `window.nanoAnalise` (`fila`, `marcar`, `arquivos`, `itens`, `ler`, `detalhe`, `salvar`, `falhar`)
+para ler edital, TR e anexos (PDF, ZIP, DOCX), escrever a pré-análise e devolvê-la ao card.
 
 Motivos de descarte: `escopo`, `erp`, `hardware`, `longe`, `valor`, `exigencia`, `prazo`, `marca`, `duplicado`, `outro`.
 

@@ -98,7 +98,104 @@ async function carregarServidor(){
     salvaLocal(); store.set("migrado", true);
     atualizaSync();
     for(const id of subir) await enviar(id);
+    await carregarAnalises();
   }catch(e){ apiOk = false; atualizaSync(); }
+}
+
+// ---- pré-análise (fila no banco; quem processa é a rodada agendada no Claude)
+let analises = new Map();          // id -> {status, resumo, pedido_em, concluido_em, erro}
+const analiseTexto = new Map();    // id -> resultado em markdown (carregado ao abrir)
+const analiseAberta = new Set();
+async function carregarAnalises(){
+  if(!API || !apiOk) return;
+  try{
+    const r = await fetchT("/api/analises", { cache:"no-store" }, 15000);
+    if(!r.ok) return;
+    const j = await r.json(); analises = new Map((j.analises || []).map(a => [a.id, a]));
+  }catch(e){}
+}
+function proximaRodada(){
+  const d = new Date(); const slots = [[7,30],[13,30]];
+  for(let i = 0; i < 8; i++){
+    const dia = new Date(d.getFullYear(), d.getMonth(), d.getDate() + i);
+    if(dia.getDay() === 0 || dia.getDay() === 6) continue;
+    for(const [h, m] of slots){ const t = new Date(dia); t.setHours(h, m, 0, 0); if(t > d) return t; }
+  }
+  return null;
+}
+function fmtRodada(t){
+  if(!t) return "";
+  const hoje = new Date(); const am = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + 1);
+  const hora = t.toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" });
+  if(t.toDateString() === hoje.toDateString()) return "hoje " + hora;
+  if(t.toDateString() === am.toDateString()) return "amanhã " + hora;
+  return t.toLocaleDateString("pt-BR", { weekday:"short", day:"2-digit", month:"2-digit" }) + " " + hora;
+}
+async function pedirAnalise(id){
+  if(!API || !apiOk){ toast("A pré-análise precisa da conexão com o banco do monitor"); return; }
+  if(marks[id] !== "interesse") marcar(id, "interesse");
+  const rec = recById(id);
+  const snap = snaps[id] || (rec ? snapshot(rec) : null);
+  try{
+    const r = await fetchT("/api/analises/" + encodeURIComponent(id), { method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({ snap }) }, 15000);
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    analises.set(id, { id, status:"pendente", pedido_em: new Date().toISOString() });
+    analiseTexto.delete(id); analiseAberta.delete(id);
+    render(); toast("Pré-análise na fila · próxima rodada " + fmtRodada(proximaRodada()));
+  }catch(e){ toast("Não consegui pedir a pré-análise. Tente de novo."); }
+}
+async function cancelarAnalise(id){
+  try{ await fetchT("/api/analises/" + encodeURIComponent(id), { method:"DELETE" }, 15000); analises.delete(id); render(); toast("Pedido de pré-análise cancelado"); }
+  catch(e){ toast("Não consegui cancelar agora"); }
+}
+async function abrirAnalise(id){
+  if(analiseAberta.has(id)){ analiseAberta.delete(id); render(); return; }
+  analiseAberta.add(id);
+  if(!analiseTexto.has(id)){
+    try{ const r = await fetchT("/api/analises/" + encodeURIComponent(id), { cache:"no-store" }, 15000); const j = await r.json(); analiseTexto.set(id, j.resultado || "(sem texto)"); }
+    catch(e){ analiseTexto.set(id, "Não consegui carregar a pré-análise agora."); }
+  }
+  render();
+}
+// markdown simples -> HTML (títulos, listas, tabelas, negrito, links)
+function md(src){
+  const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  const linhas = String(src || "").replace(/\r/g, "").split("\n"); let h = "", lista = false, tabela = false;
+  const fecha = () => { if(lista){ h += "</ul>"; lista = false; } if(tabela){ h += "</table></div>"; tabela = false; } };
+  for(const l of linhas){
+    const t = l.trim();
+    if(/^\|.*\|$/.test(t)){
+      if(/^\|[\s:|-]+\|$/.test(t)) continue;
+      if(!tabela){ fecha(); h += '<div class="tbl"><table>'; tabela = true; }
+      h += "<tr>" + t.slice(1, -1).split("|").map(c => "<td>" + inline(c.trim()) + "</td>").join("") + "</tr>"; continue;
+    }
+    if(/^[-*] /.test(t)){ if(tabela) fecha(); if(!lista){ h += "<ul>"; lista = true; } h += "<li>" + inline(t.slice(2)) + "</li>"; continue; }
+    fecha();
+    if(!t) continue;
+    const m = t.match(/^(#{1,4}) (.*)$/);
+    if(m){ h += "<h" + (m[1].length + 2) + ">" + inline(m[2]) + "</h" + (m[1].length + 2) + ">"; continue; }
+    h += "<p>" + inline(t) + "</p>";
+  }
+  fecha(); return h;
+}
+function blocoAnalise(rec){
+  if(!API) return "";
+  const a = analises.get(rec.id);
+  let h = '<div class="analise-linha">';
+  if(!a) h += '<button class="mark" type="button" data-act="pedir">🔍 Pedir pré-análise</button>';
+  else if(a.status === "pendente") h += '<span class="pill">pré-análise na fila · ' + esc(fmtRodada(proximaRodada())) + '</span><button class="mark" type="button" data-act="cancelarAnalise">cancelar</button>';
+  else if(a.status === "processando") h += '<span class="pill">analisando os documentos…</span>';
+  else if(a.status === "erro") h += '<span class="pill warn">pré-análise falhou</span><span class="meta">' + esc((a.erro || "").slice(0, 160)) + '</span><button class="mark" type="button" data-act="pedir">tentar de novo</button>';
+  else if(a.status === "pronta"){
+    const rz = a.resumo || {};
+    h += '<span class="pill ok">pré-análise pronta</span>' + (rz.recomendacao ? '<span class="pill ' + (/n[aã]o/i.test(rz.recomendacao) ? "warn" : "lime") + '">' + esc(rz.recomendacao) + '</span>' : "") +
+         (rz.sessao ? '<span class="meta">sessão ' + esc(rz.sessao) + '</span>' : "") +
+         '<button class="mark" type="button" data-act="verAnalise">' + (analiseAberta.has(rec.id) ? "fechar" : "ver pré-análise") + '</button>' +
+         '<button class="mark" type="button" data-act="pedir">refazer</button>';
+  }
+  h += '</div>';
+  if(a && a.status === "pronta" && analiseAberta.has(rec.id)) h += '<div class="analise">' + md(analiseTexto.get(rec.id) || "Carregando…") + '</div>';
+  return h;
 }
 
 // ---- tema
@@ -146,6 +243,11 @@ async function pool(tasks, n, onTick){
   return out;
 }
 const conf = rec => { const s = new Set(rec.strong); if(rec.strongItens) rec.strongItens.forEach(c => s.add(c)); return s; };
+// fetch com limite de tempo: o PNCP às vezes para de responder e a tela não pode ficar presa
+async function fetchT(url, opts, ms){
+  const c = new AbortController(); const t = setTimeout(() => c.abort(), ms || 25000);
+  try{ return await fetch(url, { ...(opts || {}), signal: c.signal }); } finally { clearTimeout(t); }
+}
 
 async function buscar(){
   if(running) return; running = true;
@@ -157,7 +259,7 @@ async function buscar(){
     const base = SEARCH + "?q=" + encodeURIComponent(t) + "&tipos_documento=edital&ordenacao=-data&tam_pagina=500&status=recebendo_proposta" + (soSup ? "&ufs=" + UFS_SUP : "");
     let todos = [];
     for(let p = 1; p <= 4; p++){
-      const r = await fetch(base + "&pagina=" + p);
+      const r = await fetchT(base + "&pagina=" + p, null, 30000);
       if(!r.ok) throw new Error("HTTP "+r.status);
       const j = await r.json(); const its = j.items || [];
       todos = todos.concat(its);
@@ -232,7 +334,7 @@ async function verificarItens(){
     await pool(cand.map(rec => async () => {
       const it = rec.it; let arr = [];
       for(let p = 1; p <= 4; p++){
-        const r = await fetch(ITENS + it.orgao_cnpj + "/compras/" + it.ano + "/" + it.numero_sequencial + "/itens?pagina=" + p + "&tamanhoPagina=500");
+        const r = await fetchT(ITENS + it.orgao_cnpj + "/compras/" + it.ano + "/" + it.numero_sequencial + "/itens?pagina=" + p + "&tamanhoPagina=500", null, 20000);
         if(!r.ok) throw new Error("HTTP " + r.status);
         const j = await r.json(); const a = Array.isArray(j) ? j : (j.data || []);
         arr = arr.concat(a); if(a.length < 500) break;
@@ -431,7 +533,7 @@ function card(v){
       '<span class="meta">'+esc(plataforma(rec))+'</span>'+
       '<a href="'+esc(linkPncp(rec))+'" target="_blank" rel="noopener">Edital no PNCP ↗</a>'+origem+
       '<span class="sp"></span>'+ botoes +
-    '</div>' + (abrirMotivo === rec.id ? painelMotivo(rec.id) : '') + '</article>';
+    '</div>' + (marca !== "descartado" ? blocoAnalise(rec) : '') + (abrirMotivo === rec.id ? painelMotivo(rec.id) : '') + '</article>';
 }
 
 function painelAprendizado(){
@@ -500,7 +602,7 @@ async function carregarDetalhes(recs){
   await pool(falta.map(rec => async () => {
     if(details.has(rec.id)) return;
     const it = rec.it;
-    const r = await fetch(CONSULTA + it.orgao_cnpj + "/compras/" + it.ano + "/" + it.numero_sequencial);
+    const r = await fetchT(CONSULTA + it.orgao_cnpj + "/compras/" + it.ano + "/" + it.numero_sequencial, null, 15000);
     details.set(rec.id, r.ok ? await r.json() : {});
   }), 4);
   if(myRun === detRun) render();
@@ -539,6 +641,9 @@ $("#lista").addEventListener("click", e => {
   else if(act === "descartar"){ abrirMotivo = abrirMotivo === id ? null : id; render(); const inp = document.querySelector('.ed[data-id="' + CSS.escape(id) + '"] .obs-in'); if(inp) inp.focus({preventScroll:true}); }
   else if(act === "cancelar"){ abrirMotivo = null; render(); }
   else if(act === "restaurar"){ marcar(id, null); toast("Restaurado para os abertos"); }
+  else if(act === "pedir") pedirAnalise(id);
+  else if(act === "cancelarAnalise") cancelarAnalise(id);
+  else if(act === "verAnalise") abrirAnalise(id);
 });
 $("#lista").addEventListener("keydown", e => {
   if(e.key === "Enter" && e.target.classList.contains("obs-in")){
@@ -618,6 +723,118 @@ if(fs){
 }
 catsAtivas();
 atualizaSync();
+
+// ---- ferramentas para a rodada agendada de pré-análise (usadas pelo Claude no navegador do app)
+// Fluxo: fila() -> marcar(id,"processando") -> arquivos(id) / itens(id) -> ler(id, seq, inicio) em partes -> salvar(id, resultado, resumo)
+const CDN = {
+  pdf: "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js",
+  pdfWorker: "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js",
+  zip: "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
+};
+const scriptsCarregados = {};
+function carregaScript(src){
+  if(!scriptsCarregados[src]) scriptsCarregados[src] = new Promise((ok, falha) => {
+    const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = () => falha(new Error("não carregou " + src)); document.head.appendChild(s);
+  });
+  return scriptsCarregados[src];
+}
+const filaSnaps = new Map();
+const textoDoc = new Map();
+const PROXY = "/api/pncp-proxy/";
+function compraPath(id){
+  const s = (filaSnaps.get(id) || snaps[id] || {}); const it = s.it || {};
+  if(!it.orgao_cnpj){ const m = String(id).match(/^(\d{14})-\d+-0*(\d+)\/(\d{4})$/); if(m) return "orgaos/" + m[1] + "/compras/" + m[3] + "/" + m[2]; throw new Error("edital sem CNPJ/ano/sequencial: " + id); }
+  return "orgaos/" + it.orgao_cnpj + "/compras/" + it.ano + "/" + it.numero_sequencial;
+}
+async function pdfTexto(buf){
+  await carregaScript(CDN.pdf);
+  const pdfjs = window.pdfjsLib; pdfjs.GlobalWorkerOptions.workerSrc = CDN.pdfWorker;
+  const doc = await pdfjs.getDocument({ data: buf }).promise;
+  let out = "";
+  for(let p = 1; p <= doc.numPages; p++){
+    const pg = await doc.getPage(p); const tc = await pg.getTextContent();
+    out += "\n[página " + p + "]\n" + tc.items.map(i => i.str + (i.hasEOL ? "\n" : " ")).join("").replace(/[ \t]+\n/g, "\n");
+  }
+  return { paginas: doc.numPages, texto: out };
+}
+function docxTexto(xml){
+  const d = new DOMParser().parseFromString(xml, "application/xml");
+  return [...d.getElementsByTagName("w:p")].map(p => [...p.getElementsByTagName("w:t")].map(t => t.textContent).join("")).join("\n");
+}
+async function extrair(buf, nome){
+  const b = new Uint8Array(buf.slice(0, 4)); const magic = String.fromCharCode(...b);
+  if(magic.startsWith("%PDF")){ const r = await pdfTexto(buf); return { tipo:"pdf", paginas:r.paginas, texto:r.texto, escaneado: r.texto.replace(/\[página \d+\]|\s/g, "").length < r.paginas * 80 }; }
+  if(magic.startsWith("PK")){
+    await carregaScript(CDN.zip);
+    const z = await window.JSZip.loadAsync(buf);
+    if(z.file("word/document.xml")) return { tipo:"docx", texto: docxTexto(await z.file("word/document.xml").async("string")) };
+    let out = "", lista = [];
+    for(const f of Object.values(z.files)){
+      if(f.dir) continue; lista.push(f.name);
+      if(/\.(pdf|docx|txt)$/i.test(f.name)){
+        try{ const r = await extrair(await f.async("arraybuffer"), f.name); out += "\n\n===== " + f.name + " (" + r.tipo + (r.paginas ? ", " + r.paginas + " pág." : "") + (r.escaneado ? ", ESCANEADO sem texto" : "") + ") =====\n" + r.texto; }
+        catch(e){ out += "\n\n===== " + f.name + " (não consegui ler: " + e.message + ") =====\n"; }
+      }
+    }
+    return { tipo:"zip", arquivos:lista, texto: out };
+  }
+  if(/\.txt$/i.test(nome || "")) return { tipo:"txt", texto: new TextDecoder().decode(buf) };
+  return { tipo:"desconhecido (" + magic.replace(/[^\x20-\x7e]/g, "?") + ")", texto:"" };
+}
+window.nanoAnalise = {
+  versao: 1,
+  async fila(){
+    const r = await fetchT("/api/analises", { cache:"no-store" }, 20000);
+    if(!r.ok) throw new Error("API de análises respondeu " + r.status);
+    const j = await r.json();
+    return (j.analises || []).filter(a => a.status === "pendente").map(a => {
+      if(a.snap) filaSnaps.set(a.id, a.snap);
+      const it = (a.snap && a.snap.it) || {};
+      return { id:a.id, pedido_em:a.pedido_em, orgao:it.orgao_nome, unidade:it.unidade_nome, municipio:it.municipio_nome, uf:it.uf, km:a.snap && a.snap.km,
+               objeto:(it.description || it.title || "").replace(/^\[[^\]]+\]\s*-\s*/, ""), encerramento:a.snap && a.snap.fim, plataforma:it.usuario_nome,
+               valor_estimado:a.snap && a.snap.valor, link_pncp: "https://pncp.gov.br/app/editais" + String(it.item_url || "").replace(/^\/compras/, ""),
+               link_origem: a.snap && a.snap.origem, itens_encontrados: a.snap && a.snap.itens };
+    });
+  },
+  async marcar(id, status, extra){
+    const r = await fetchT("/api/analises/" + encodeURIComponent(id), { method:"PUT", headers:{"content-type":"application/json"}, body: JSON.stringify({ status, ...(extra || {}) }) }, 20000);
+    if(!r.ok) throw new Error("PUT respondeu " + r.status + ": " + await r.text());
+    return true;
+  },
+  async detalhe(id){ const r = await fetchT(PROXY + "api/consulta/v1/" + compraPath(id), null, 30000); return r.ok ? r.json() : { erro: "HTTP " + r.status }; },
+  async arquivos(id){
+    const r = await fetchT(PROXY + "api/pncp/v1/" + compraPath(id) + "/arquivos", null, 45000);
+    if(!r.ok) throw new Error("lista de arquivos respondeu " + r.status);
+    const arr = await r.json();
+    return (Array.isArray(arr) ? arr : []).filter(a => a.statusAtivo !== false)
+      .map(a => ({ seq: a.sequencialDocumento, titulo: a.titulo, tipo: a.tipoDocumentoNome || a.tipoDocumentoDescricao, publicado: a.dataPublicacaoPncp }));
+  },
+  async itens(id){
+    const r = await fetchT(PROXY + "api/pncp/v1/" + compraPath(id) + "/itens?pagina=1&tamanhoPagina=500", null, 45000);
+    if(!r.ok) throw new Error("itens responderam " + r.status);
+    const arr = await r.json();
+    return (Array.isArray(arr) ? arr : (arr.data || [])).map(x => ({ numero:x.numeroItem, descricao:x.descricao, quantidade:x.quantidade, unidade:x.unidadeMedida,
+      valor_unitario:x.valorUnitarioEstimado, valor_total:x.valorTotal, material_ou_servico:x.materialOuServicoNome, criterio:x.criterioJulgamentoNome, beneficio:x.tipoBeneficioNome }));
+  },
+  // lê um documento em partes de até `tamanho` caracteres; chame de novo com o `proximo` devolvido até ele vir null
+  async ler(id, seq, inicio, tamanho){
+    const chave = id + "#" + seq;
+    if(!textoDoc.has(chave)){
+      const r = await fetchT(PROXY + "api/pncp/v1/" + compraPath(id) + "/arquivos/" + seq, null, 90000);
+      if(!r.ok) throw new Error("download respondeu " + r.status);
+      const nome = ((r.headers.get("content-disposition") || "").match(/filename\*?=(?:UTF-8'')?"?([^";]+)/i) || [])[1] || "";
+      const buf = await r.arrayBuffer();
+      const x = await extrair(buf, decodeURIComponent(nome));
+      textoDoc.set(chave, { nome: decodeURIComponent(nome), bytes: buf.byteLength, ...x });
+    }
+    const d = textoDoc.get(chave); const ini = inicio || 0; const tam = tamanho || 40000;
+    const fim = Math.min(d.texto.length, ini + tam);
+    return { arquivo: d.nome, tipo: d.tipo, paginas: d.paginas, escaneado: !!d.escaneado, arquivos_no_zip: d.arquivos, total: d.texto.length,
+             inicio: ini, fim, proximo: fim < d.texto.length ? fim : null, texto: d.texto.slice(ini, fim) };
+  },
+  async salvar(id, resultado, resumo){ await this.marcar(id, "pronta", { resultado, resumo }); analises.set(id, { id, status:"pronta", resumo }); analiseTexto.set(id, resultado); render(); return true; },
+  async falhar(id, erro){ await this.marcar(id, "erro", { erro: String(erro).slice(0, 1500) }); return true; }
+};
 
 carregarServidor().then(() => { treinar(); render(); });
 buscar().catch(e => { running=false; $("#btnAtualizar").disabled=false; setStatus("Falha ao consultar o PNCP: " + e.message); $("#lista").innerHTML = '<div class="empty">Não consegui falar com o PNCP. Confira a internet e clique em Atualizar.</div>'; });
