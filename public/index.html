@@ -191,7 +191,7 @@ label.chk{display:flex;gap:.35rem;align-items:center;font-size:.85rem;color:var(
 <div class="wrap">
 
 <div class="verbar">
-  <span class="tag">v7.3 · 08/11/2026</span>
+  <span class="tag">v7.4 · 08/11/2026</span>
   <span>Novo: Abertos mostra só o que falta triar — ao marcar Interesse, Vamos participar ou Descartar, o edital vai para a aba correspondente. Aviso de certidões vencidas da pasta-mestre no topo. Pipeline: "✅ Vamos participar" no card leva o edital para a aba Pipeline; a rodada seguinte (7h06/13h06) cria a pasta no SharePoint, copia os documentos da pasta-mestre e monta o checklist. Depois: Proposta enviada → Ganhamos / Perdemos / Desistimos.</span>
   <span class="spacer"></span>
   <button class="btn-theme" id="themeBtn" type="button">Tema</button>
@@ -876,7 +876,6 @@ async function verificarItens(){
   const cand = [...items.values()].filter(r => !r.itens && marks[r.id] !== "descartado" && passaUF(r, f0) && !elegiveis(r, f0).length
       && [...r.cats].some(c => c !== "sup" && f0.ativas.has(c) && dentro(r, c, f0)));
   if(cand.length){
-    let mudou = 0;
     await pool(cand.map(rec => async () => {
       const it = rec.it; let arr = [];
       for(let p = 1; p <= 4; p++){
@@ -894,7 +893,7 @@ async function verificarItens(){
       for(const k in m) m[k] = m[k].slice(0, 5);
       itensCache[rec.id] = { t: Date.now(), m };
       aplicaItens(rec, m);
-      if(Object.keys(m).length && ++mudou % 5 === 0) render();
+      if(Object.keys(m).length) renderDepois(1200);
     }), 6, (d,n) => setStatus("Conferindo itens dos editais… " + d + "/" + n));
     const ks = Object.keys(itensCache);
     if(ks.length > 1500) ks.sort((a,b) => itensCache[a].t - itensCache[b].t).slice(0, ks.length - 1500).forEach(k => delete itensCache[k]);
@@ -904,7 +903,7 @@ async function verificarItens(){
   treinar();
   const f = window.__falhasBusca || 0;
   setStatus(f ? "Atualizado com " + f + " falha(s) na busca — tente de novo." : "Atualizado às " + horaAgora());
-  render();
+  renderDepois(50);
   verifRodando = false;
   if(verifPendente){ verifPendente = false; verificarItens(); }
 }
@@ -916,6 +915,11 @@ const STOP = new Set(("para pela pelo pelos pelas com sem dos das nos nas por qu
   "registro precos preco futura futuras futuro eventual eventuais objeto presente licitacao pregao eletronico edital forma modalidade item itens lote lotes " +
   "unidade unidades periodo meses anos visando destinados destinadas destinado destinada conforme termo referencia anexo durante tipo").split(" "));
 function tokens(texto){ return [...new Set(norm(texto).replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).filter(w => w.length >= 4 && !STOP.has(w) && !/^\d+$/.test(w)))]; }
+function tokensRec(rec){
+  const chave = rec.itens || null;
+  if(!rec._tok || rec._tokChave !== chave){ rec._tok = tokens(textoRec(rec)); rec._tokChave = chave; }
+  return rec._tok;
+}
 function textoRec(rec){ const its = rec.itens ? Object.values(rec.itens).flat().map(x => x[1]).join(" ") : ""; return (rec.it.description || rec.it.title || "") + " " + its; }
 function valorRec(rec){ const d = details.get(rec.id) || {}; return d.valorTotalEstimado || rec.it.valor_global || rec._valor || (snaps[rec.id] && snaps[rec.id].valor) || 0; }
 let modelo = { pronto:false, nI:0, nD:0 };
@@ -923,7 +927,7 @@ function treinar(){
   const I = [], D = [];
   for(const [id, a] of Object.entries(marks)){
     const rec = recById(id); if(!rec) continue;
-    (a === "interesse" ? I : D).push({ rec, t: tokens(textoRec(rec)) });
+    (a === "interesse" ? I : D).push({ rec, t: tokensRec(rec) });
   }
   // descarte por distância, valor, prazo, exigência ou duplicidade não diz nada sobre o assunto do edital:
   // esses entram como regra (km/valor) e ficam fora do aprendizado por palavras
@@ -946,12 +950,15 @@ function treinar(){
 }
 function pontua(rec){
   if(!modelo.pronto) return null;
+  const tok = tokensRec(rec), v0 = valorRec(rec);
+  if(rec._pModelo === modelo && rec._pTok === tok && rec._pV === v0) return rec._p;
   let s = modelo.prior;
-  for(const w of tokens(textoRec(rec))){ const p = modelo.peso.get(w); if(p) s += p; }
+  for(const w of tok){ const p = modelo.peso.get(w); if(p) s += p; }
   if(modelo.kmLonge != null && rec.km >= modelo.kmLonge) s -= 1.5;
   const v = valorRec(rec); if(modelo.valorBaixo != null && v > 0 && v <= modelo.valorBaixo) s -= 1.5;
   s = Math.max(-8, Math.min(8, s));
-  return 1 / (1 + Math.exp(-s));
+  rec._pModelo = modelo; rec._pTok = tok; rec._pV = v0;
+  return (rec._p = 1 / (1 + Math.exp(-s)));
 }
 
 function filtros(){
@@ -1097,7 +1104,7 @@ function card(v){
       (part ? '<button class="mark" type="button" data-act="irPipeline">ver no pipeline</button>'
             : (API ? '<button class="mark go" type="button" data-act="participar">✅ Vamos participar</button>' : '') +
               '<button class="mark dis" type="button" data-act="descartar">✕ Descartar</button>');
-  return '<article class="'+cls.join(" ")+'" data-id="'+esc(rec.id)+'">'+
+  return '<article class="'+cls.join(" ")+'" data-id="'+esc(rec.id)+'" data-k="'+esc(rec.id)+'">'+
     '<div class="top">'+pills.join("")+'<span class="days">'+esc(diasTxt)+'</span></div>'+
     '<h3>'+esc(it.orgao_nome || "")+'</h3>'+
     '<div class="meta">'+esc(it.municipio_nome)+'/'+esc(it.uf)+' · <span class="mono">'+(rec.km != null ? rec.km.toLocaleString("pt-BR") : "?")+' km</span> · '+esc(it.modalidade_licitacao_nome||"")+' · encerra <span class="mono">'+esc(fmtData(rec.fim))+'</span>'+(it.unidade_nome && it.unidade_nome!==it.orgao_nome ? ' · '+esc(it.unidade_nome) : '')+'</div>'+
@@ -1139,10 +1146,48 @@ function painelAprendizado(){
   return h + '</div>';
 }
 
+// troca só os cards que mudaram: o resto da lista fica intacto (clique e digitação não se perdem)
+const htmlDoNo = new WeakMap();
+function patchLista(partes){
+  const el = $("#lista");
+  const atuais = new Map();
+  for(const n of el.children) if(n.dataset && n.dataset.k) atuais.set(n.dataset.k, n);
+  const nos = partes.map(({ k, h }) => {
+    const velho = atuais.get(k);
+    if(velho && htmlDoNo.get(velho) === h) return velho;
+    const t = document.createElement("template"); t.innerHTML = h.trim();
+    const novo = t.content.firstElementChild; htmlDoNo.set(novo, h); return novo;
+  });
+  const filhos = [...el.children];
+  if(filhos.length === nos.length && filhos.every((n, i) => n === nos[i])) return;
+  if(filhos.length === nos.length && filhos.every((n, i) => n.dataset && n.dataset.k === nos[i].dataset.k)){
+    filhos.forEach((n, i) => { if(n !== nos[i]) n.replaceWith(nos[i]); });
+    return;
+  }
+  el.replaceChildren(...nos);
+}
+// atualizações em segundo plano (conferência de itens, detalhes): agrupadas e adiadas enquanto o botão do mouse/dedo
+// está pressionado ou enquanto se digita a observação, para nenhum clique se perder
+let ponteiroAbaixo = false, renderAgendado = null, renderPara = 0;
+document.addEventListener("pointerdown", () => { ponteiroAbaixo = true; }, true);
+["pointerup", "pointercancel"].forEach(ev => document.addEventListener(ev, () => { ponteiroAbaixo = false; }, true));
+function renderDepois(ms){
+  const quando = Date.now() + (ms == null ? 800 : ms);
+  if(renderAgendado){ if(quando >= renderPara) return; clearTimeout(renderAgendado); }   // um pedido mais urgente antecipa o agendado
+  const tenta = () => {
+    const digitando = document.activeElement && document.activeElement.classList && document.activeElement.classList.contains("obs-in");
+    if(ponteiroAbaixo || digitando){ renderPara = Date.now() + 400; renderAgendado = setTimeout(tenta, 400); return; }
+    renderAgendado = null; render();
+  };
+  renderPara = quando; renderAgendado = setTimeout(tenta, quando - Date.now());
+}
+
 function render(){
+  if(renderAgendado){ clearTimeout(renderAgendado); renderAgendado = null; }
   const f = filtros();
-  const abertos = listaAbertos(f);
-  const noRaio = listaAbertos(f, true).filter(v => v.forte);
+  const todosAbertos = listaAbertos(f, true);
+  const abertos = todosAbertos.filter(v => marks[v.rec.id] !== "interesse" && !particip.has(v.rec.id));
+  const noRaio = todosAbertos.filter(v => v.forte);
   const tem = (r, pred) => elegiveis(r, f).some(pred);
   $("#nTotal").textContent = noRaio.length;
   $("#n7").textContent = noRaio.filter(v => { const d = diasAte(v.rec.fim); return d !== null && d <= 7; }).length;
@@ -1160,7 +1205,7 @@ function render(){
   avisoDocs();
   if(aba === "aprendizado"){
     $("#countLbl").textContent = "";
-    $("#lista").innerHTML = painelAprendizado();
+    patchLista([{ k: "aprendizado", h: '<div data-k="aprendizado">' + painelAprendizado() + '</div>' }]);
     return;
   }
   const vis = aba === "abertos" ? abertos : visiveis();
@@ -1174,18 +1219,19 @@ function render(){
               : aba === "descartados" ? "Nenhum edital descartado ainda."
               : aba === "pipeline" ? "Nada no pipeline ainda. Num edital de Abertos ou ★ Interesse, clique em ✅ Vamos participar: a rodada seguinte cria a pasta no SharePoint, copia os documentos da pasta-mestre e monta o checklist."
               : "Nenhum edital aberto com esses filtros. Amplie o raio ou o alcance, ligue mais linhas ou marque \"Mostrar possíveis\".";
-  let html = "";
+  const partes = [];
   if(aba === "pipeline"){
     const titulos = ["Vamos participar", "Proposta enviada", "Resultado"]; let g = -1;
     for(const v of vis){
       const gi = ordemEtapa[v.etapa];
-      if(gi !== g){ g = gi; html += '<h2 class="grp">' + titulos[gi] + ' <span class="n">' + vis.filter(x => ordemEtapa[x.etapa] === gi).length + '</span></h2>'; }
-      html += card(v);
+      if(gi !== g){ g = gi; partes.push({ k: "grp-" + gi, h: '<h2 class="grp" data-k="grp-' + gi + '">' + titulos[gi] + ' <span class="n">' + vis.filter(x => ordemEtapa[x.etapa] === gi).length + '</span></h2>' }); }
+      partes.push({ k: v.rec.id, h: card(v) });
     }
-  } else html = vis.map(card).join("");
+  } else for(const v of vis) partes.push({ k: v.rec.id, h: card(v) });
+  if(!vis.length) partes.push({ k: "vazio", h: '<div class="empty" data-k="vazio">' + vazio + '</div>' });
   const ativo = document.activeElement && document.activeElement.classList && document.activeElement.classList.contains("obs-in") ? document.activeElement : null;
   const foco = ativo ? { id: (ativo.closest(".ed") || {}).dataset?.id, ini: ativo.selectionStart, fim: ativo.selectionEnd } : null;
-  $("#lista").innerHTML = vis.length ? html : '<div class="empty">' + vazio + '</div>';
+  patchLista(partes);
   if(foco && foco.id){
     const inp = document.querySelector('.ed[data-id="' + CSS.escape(foco.id) + '"] .obs-in');
     if(inp){ inp.focus({ preventScroll: true }); try{ inp.setSelectionRange(foco.ini, foco.fim); }catch(e){} }
@@ -1204,7 +1250,7 @@ async function carregarDetalhes(recs){
     const r = await fetchT(CONSULTA + it.orgao_cnpj + "/compras/" + it.ano + "/" + it.numero_sequencial, null, 15000);
     details.set(rec.id, r.ok ? await r.json() : {});
   }), 4);
-  if(myRun === detRun) render();
+  if(myRun === detRun) renderDepois();
 }
 
 // ---- marcações
