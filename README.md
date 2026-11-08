@@ -12,3 +12,6 @@ Sophos (por linha de produto), backup/Acronis e Microsoft no Brasil todo, e supo
 - `build.mjs` — gera `public/index.html` (`node build.mjs`).
 - `public/index.html` — o que vai ao ar. Sempre rode o build antes do commit.
 - `wrangler.jsonc` — configuração do Worker `editais-nano` (só arquivos estáticos).
+
+## Como atualizar
+Edite `src/template.html`, rode `node build.mjs` e faça push na `main`. O Cloudflare publica em cerca de 1 minuto no mesmo endereço.
