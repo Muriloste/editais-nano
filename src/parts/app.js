@@ -416,6 +416,8 @@ let details = new Map(); // id -> detalhe da API de consulta
 let running = false;
 let aba = "abertos";
 let abrirMotivo = null;   // id do card com o painel de motivo aberto
+let motivoEscolhido = null;  // motivo marcado no painel aberto (só grava ao confirmar)
+const rascunhoObs = {};      // id -> texto da observação sendo digitada (sobrevive às atualizações da lista)
 
 function setStatus(t){ $("#status").textContent = t; }
 function toast(t){ const el=$("#toast"); el.textContent=t; el.classList.add("on"); setTimeout(()=>el.classList.remove("on"), 2000); }
@@ -689,9 +691,10 @@ function itemTxt(x){ const v = fmtValor(x[4]); return "Item " + x[0] + " · " + 
 
 function painelMotivo(id){
   return '<div class="motivos" data-id="' + esc(id) + '">' +
-    '<div class="q">Por que descartar?</div>' +
-    '<div class="opts">' + MOTIVOS.map(m => '<button class="mot" type="button" data-motivo="' + m[0] + '">' + esc(m[1]) + '</button>').join("") + '</div>' +
-    '<div class="obs"><input type="text" class="obs-in" maxlength="300" placeholder="Observação (opcional): ex. exige atestado de 500 usuários">' +
+    '<div class="q">Por que descartar? <span class="meta">escolha o motivo, detalhe se quiser e confirme</span></div>' +
+    '<div class="opts">' + MOTIVOS.map(m => '<button class="mot" type="button" data-motivo="' + m[0] + '" aria-pressed="' + (motivoEscolhido === m[0]) + '">' + esc(m[1]) + '</button>').join("") + '</div>' +
+    '<div class="obs"><input type="text" class="obs-in" maxlength="300" value="' + esc(rascunhoObs[id] || "") + '" placeholder="Observação (opcional): ex. exige atestado de 500 usuários">' +
+    '<button class="mark dis" type="button" data-act="confirmarDescarte">✕ Descartar</button>' +
     '<button class="mark" type="button" data-act="cancelar">Cancelar</button></div></div>';
 }
 
@@ -818,7 +821,13 @@ function render(){
       html += card(v);
     }
   } else html = vis.map(card).join("");
+  const ativo = document.activeElement && document.activeElement.classList && document.activeElement.classList.contains("obs-in") ? document.activeElement : null;
+  const foco = ativo ? { id: (ativo.closest(".ed") || {}).dataset?.id, ini: ativo.selectionStart, fim: ativo.selectionEnd } : null;
   $("#lista").innerHTML = vis.length ? html : '<div class="empty">' + vazio + '</div>';
+  if(foco && foco.id){
+    const inp = document.querySelector('.ed[data-id="' + CSS.escape(foco.id) + '"] .obs-in');
+    if(inp){ inp.focus({ preventScroll: true }); try{ inp.setSelectionRange(foco.ini, foco.fim); }catch(e){} }
+  }
   carregarDetalhes(vis.slice(0, 120).map(v => v.rec).filter(r => !r._snap));
 }
 
@@ -852,22 +861,32 @@ function marcar(id, acao, motivo, obs){
   }
   salvaLocal(); treinar(); render(); enviar(id);
 }
+function confirmarDescarte(id){
+  const inp = document.querySelector('.ed[data-id="' + CSS.escape(id) + '"] .obs-in');
+  const obs = ((inp && inp.value) || rascunhoObs[id] || "").trim();
+  if(!motivoEscolhido && !obs){ toast("Escolha um motivo ou escreva a observação"); if(inp) inp.focus({preventScroll:true}); return; }
+  const mot = motivoEscolhido || "outro";
+  abrirMotivo = null; motivoEscolhido = null; delete rascunhoObs[id];
+  marcar(id, "descartado", mot, obs);
+  toast("Descartado: " + nomeMotivo(mot));
+}
 $("#lista").addEventListener("click", e => {
   const card = e.target.closest(".ed"); if(!card) return;
   const id = card.dataset.id;
   const mot = e.target.closest(".mot");
   if(mot){
-    const obs = (card.querySelector(".obs-in") || {}).value || "";
-    abrirMotivo = null;
-    marcar(id, "descartado", mot.dataset.motivo, obs.trim());
-    toast("Descartado: " + nomeMotivo(mot.dataset.motivo));
+    const inp = card.querySelector(".obs-in"); if(inp) rascunhoObs[id] = inp.value;
+    motivoEscolhido = motivoEscolhido === mot.dataset.motivo ? null : mot.dataset.motivo;
+    render();
+    const novo = document.querySelector('.ed[data-id="' + CSS.escape(id) + '"] .obs-in'); if(novo){ novo.focus({preventScroll:true}); const n = novo.value.length; try{ novo.setSelectionRange(n, n); }catch(e){} }
     return;
   }
   const b = e.target.closest(".mark"); if(!b) return;
   const act = b.dataset.act;
   if(act === "interesse"){ marcar(id, marks[id] === "interesse" ? null : "interesse"); toast(marks[id] ? "★ Marcado com interesse" : "Interesse removido"); }
-  else if(act === "descartar"){ abrirMotivo = abrirMotivo === id ? null : id; render(); const inp = document.querySelector('.ed[data-id="' + CSS.escape(id) + '"] .obs-in'); if(inp) inp.focus({preventScroll:true}); }
-  else if(act === "cancelar"){ abrirMotivo = null; render(); }
+  else if(act === "confirmarDescarte") confirmarDescarte(id);
+  else if(act === "descartar"){ abrirMotivo = abrirMotivo === id ? null : id; motivoEscolhido = null; render(); const inp = document.querySelector('.ed[data-id="' + CSS.escape(id) + '"] .obs-in'); if(inp) inp.focus({preventScroll:true}); }
+  else if(act === "cancelar"){ delete rascunhoObs[id]; abrirMotivo = null; motivoEscolhido = null; render(); }
   else if(act === "restaurar"){ marcar(id, null); toast("Restaurado para os abertos"); }
   else if(act === "participar") moverEtapa(id, "participar");
   else if(act === "irPipeline"){ aba = "pipeline"; abrirMotivo = null; render(); window.scrollTo({ top: $(".tabs").offsetTop - 10 }); }
@@ -889,10 +908,11 @@ $("#lista").addEventListener("click", e => {
   else if(act === "verAnalise") abrirAnalise(id);
 });
 $("#lista").addEventListener("keydown", e => {
-  if(e.key === "Enter" && e.target.classList.contains("obs-in")){
-    const card = e.target.closest(".ed"); abrirMotivo = null;
-    marcar(card.dataset.id, "descartado", "outro", e.target.value.trim()); toast("Descartado: Outro");
-  }
+  if(e.key === "Enter" && e.target.classList.contains("obs-in")){ e.preventDefault(); confirmarDescarte(e.target.closest(".ed").dataset.id); }
+});
+// guarda o que está sendo digitado: a lista se redesenha sozinha enquanto confere itens e detalhes
+$("#lista").addEventListener("input", e => {
+  if(e.target.classList.contains("obs-in")){ const c = e.target.closest(".ed"); if(c) rascunhoObs[c.dataset.id] = e.target.value; }
 });
 
 // ---- eventos

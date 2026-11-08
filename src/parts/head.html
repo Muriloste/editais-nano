@@ -155,6 +155,8 @@ label.chk{display:flex;gap:.35rem;align-items:center;font-size:.85rem;color:var(
 .motivos .opts{display:flex;flex-wrap:wrap;gap:.35rem}
 .mot{font:inherit;font-size:.78rem;border:1px solid var(--border);background:var(--surface-2);color:var(--text);border-radius:999px;padding:.25rem .65rem;cursor:pointer}
 .mot:hover{border-color:var(--warn);color:var(--warn)}
+.mot[aria-pressed="true"]{background:var(--warn-soft);border-color:var(--warn);color:var(--warn);font-weight:600}
+.motivos .q .meta{font-weight:400;margin-left:.3rem}
 .motivos .obs{display:flex;gap:.4rem;flex-wrap:wrap}
 .motivos .obs input{flex:1;min-width:180px}
 .empty{background:var(--surface);border:1px dashed var(--border);border-radius:14px;padding:1.5rem;text-align:center;color:var(--text-soft)}
@@ -189,7 +191,7 @@ label.chk{display:flex;gap:.35rem;align-items:center;font-size:.85rem;color:var(
 <div class="wrap">
 
 <div class="verbar">
-  <span class="tag">v7.1 · 08/11/2026</span>
+  <span class="tag">v7.2 · 08/11/2026</span>
   <span>Novo: aviso de certidões vencidas ou perto de vencer na pasta-mestre (lido a cada rodada). Pipeline: "✅ Vamos participar" no card leva o edital para a aba Pipeline; a rodada seguinte (7h06/13h06) cria a pasta no SharePoint, copia os documentos da pasta-mestre e monta o checklist. Depois: Proposta enviada → Ganhamos / Perdemos / Desistimos.</span>
   <span class="spacer"></span>
   <button class="btn-theme" id="themeBtn" type="button">Tema</button>
