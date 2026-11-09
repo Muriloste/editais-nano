@@ -111,6 +111,7 @@ label.chk{display:flex;gap:.35rem;align-items:center;font-size:.85rem;color:var(
 .pill{font-size:.7rem;font-weight:600;border-radius:999px;padding:.12rem .55rem;background:var(--accent-blue-soft);color:var(--accent-blue);white-space:nowrap}
 .pill small{font-weight:500;opacity:.8}
 .pill.lime{background:var(--accent-lime-soft);color:var(--track-b-text)}
+.pill.cl{background:var(--amber-soft);color:var(--text);border:1px solid var(--amber)}
 .pill.ghost{background:transparent;border:1px dashed var(--border);color:var(--text-faint)}
 .pill.new{background:var(--call-bg);color:var(--call-text)}
 .pill.warn{background:var(--warn-soft);color:var(--warn)}
@@ -191,14 +192,14 @@ label.chk{display:flex;gap:.35rem;align-items:center;font-size:.85rem;color:var(
 <div class="wrap">
 
 <div class="verbar">
-  <span class="tag">v7.6 · 09/11/2026</span>
-  <span>Novo: Abertos mostra só o que falta triar — ao marcar Interesse, Vamos participar ou Descartar, o edital vai para a aba correspondente. Aviso de certidões vencidas da pasta-mestre no topo. Pipeline: "✅ Vamos participar" no card leva o edital para a aba Pipeline; a rodada seguinte (7h06/13h06) cria a pasta no SharePoint, copia os documentos da pasta-mestre e monta o checklist. Depois: Proposta enviada → Ganhamos / Perdemos / Desistimos.</span>
+  <span class="tag">v7.7 · 09/11/2026</span>
+  <span>Novo: boletins do ConLicitação entram na lista (selo ConLicitação), sem repetir o que já está no PNCP; filtro "Só ConLicitação". Abertos mostra só o que falta triar — ao marcar Interesse, Vamos participar ou Descartar, o edital vai para a aba correspondente. Aviso de certidões vencidas da pasta-mestre no topo. Pipeline: "✅ Vamos participar" no card leva o edital para a aba Pipeline; a rodada seguinte (7h06/13h06) cria a pasta no SharePoint, copia os documentos da pasta-mestre e monta o checklist. Depois: Proposta enviada → Ganhamos / Perdemos / Desistimos.</span>
   <span class="spacer"></span>
   <button class="btn-theme" id="themeBtn" type="button">Tema</button>
 </div>
 
 <header class="hero">
-  <div class="kicker">PNCP · consulta ao vivo · base Leme/SP</div>
+  <div class="kicker">PNCP ao vivo + boletins ConLicitação · base Leme/SP</div>
   <h1>Editais abertos para a Nano</h1>
   <p>Licitações recebendo proposta agora: Sophos, Acronis e Microsoft no Brasil todo, e suporte de TI só perto de Leme. O objeto e a lista de itens de cada edital são conferidos.</p>
   <div class="funil">
@@ -209,11 +210,13 @@ label.chk{display:flex;gap:.35rem;align-items:center;font-size:.85rem;color:var(
     <div><b id="nM365">–</b><span>Microsoft</span></div>
     <div><b id="nSup">–</b><span>Suporte TI</span></div>
     <div><b id="nLD">–</b><span>Licitar Digital</span></div>
+    <div><b id="nCL">–</b><span>ConLicitação</span></div>
     <div class="hot"><b id="nInt">–</b><span>★ Interesse</span></div>
   </div>
 </header>
 
 <section class="aviso-docs" id="avisoDocs" hidden aria-live="polite"></section>
+<section class="aviso-docs" id="avisoCL" hidden aria-live="polite"></section>
 
 <section class="controls" aria-label="Filtros">
   <div class="row">
@@ -251,6 +254,7 @@ label.chk{display:flex;gap:.35rem;align-items:center;font-size:.85rem;color:var(
   <div class="row">
     <label class="chk"><input type="checkbox" id="fracos"> Mostrar possíveis (termo só nos anexos)</label>
     <label class="chk"><input type="checkbox" id="soLD"> Só Licitar Digital</label>
+    <label class="chk"><input type="checkbox" id="soCL"> Só ConLicitação</label>
     <label class="chk"><input type="checkbox" id="ocultarProv"> Ocultar prováveis descartes</label>
   </div>
   <div class="row">
@@ -285,7 +289,8 @@ label.chk{display:flex;gap:.35rem;align-items:center;font-size:.85rem;color:var(
 <div class="src">
   Fonte: API de busca do PNCP (pncp.gov.br/api/search, editais com status "recebendo proposta"; suporte restrito a SP e MG), API de itens do PNCP (pncp.gov.br/api/pncp/v1/…/itens) e API de consulta do PNCP para valor estimado e link do sistema de origem. Os dados são consultados toda vez que a página abre ou ao clicar em Atualizar; a conferência de itens fica guardada por 12 horas neste navegador. Distâncias em linha reta a partir das coordenadas IBGE dos municípios.
   As marcações e motivos ficam no banco do monitor (Cloudflare D1), com histórico de cada decisão; se o banco não responder, ficam neste aparelho e sobem na próxima abertura.
-  <span id="lastRun"></span>
+  Boletins do ConLicitação (assinatura da Nano, uso interno): a rodada agendada lê os boletins novos às 7h06 e 13h06 e grava no banco; licitações que também estão no PNCP aparecem uma vez só.
+  <span id="lastRun"></span><span id="clInfo"></span>
 </div>
 </div>
 <div class="toast" id="toast"></div>

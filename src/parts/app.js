@@ -49,7 +49,8 @@ const MOTIVOS = [
 ];
 const nomeMotivo = c => (MOTIVOS.find(m => m[0] === c) || [c, c || "sem motivo"])[1];
 
-const SNAP_CAMPOS = ["orgao_nome","unidade_nome","municipio_nome","uf","description","title","modalidade_licitacao_nome","item_url","usuario_nome","orgao_cnpj","ano","numero_sequencial","valor_global","codigo_ibge"];
+const SNAP_CAMPOS = ["orgao_nome","unidade_nome","municipio_nome","uf","description","title","modalidade_licitacao_nome","item_url","usuario_nome","orgao_cnpj","ano","numero_sequencial","valor_global","codigo_ibge",
+  "cl_id","cl_site","cl_edital","cl_processo","cl_situacao","cl_resumo","cl_itens"];
 function snapshot(rec){
   const it = {}; SNAP_CAMPOS.forEach(k => { if(rec.it[k] != null) it[k] = rec.it[k]; });
   const d = details.get(rec.id) || {};
@@ -112,7 +113,7 @@ async function carregarServidor(){
     salvaLocal(); store.set("migrado", true);
     atualizaSync();
     for(const id of subir) await enviar(id);
-    await Promise.all([carregarAnalises(), carregarParticipacoes(), carregarDocsMestre()]);
+    await Promise.all([carregarAnalises(), carregarParticipacoes(), carregarDocsMestre(), carregarExternos()]);
   }catch(e){ apiOk = false; atualizaSync(); }
 }
 
@@ -520,6 +521,7 @@ async function buscar(){
     const c = itensCache[rec.id];
     if(c && Date.now() - c.t < ITENS_TTL) aplicaItens(rec, c.m);
   }
+  mesclarExternos(fresh);
   items = fresh;
   running = false;
   $("#btnAtualizar").disabled = false;
@@ -532,6 +534,123 @@ async function buscar(){
   store.set("seen", Array.from(new Set([...prevSeen, ...items.keys()])).slice(-3000));
   await verificarItens();
 }
+
+// ---- ConLicitação: licitações dos boletins (importadas pela rodada agendada; uso interno da Nano)
+// Cada licitação vira um card como os do PNCP. Se o ConLicitação traz o Id do PNCP, o card usa o número de controle do PNCP
+// (sem duplicar o que a busca já achou) e itens/documentos vêm do PNCP; sem PNCP, o id é "CL-<nº ConLicitação>".
+let externos = [];
+let estadoCL = null;
+const SIT_FORA = /revogad|anulad|cancelad|desert|fracassad/i;
+const PORTAIS = [[/bllcompras/,"BLL Compras"],[/bnccompras/,"BNC"],[/portaldecompraspublicas/,"Portal de Compras Públicas"],[/licitacoes-e2?\./,"Licitações-e (BB)"],
+  [/comprasnet|compras\.gov/,"Compras.gov.br"],[/bbmnet/,"BBMNET"],[/licitanet/,"Licitanet"],[/pregaobanrisul/,"Banrisul"],[/compras\.sc\.gov/,"Compras SC"],
+  [/petronect/,"Petronect"],[/selcorp/,"Selcorp"],[/licitardigital/,"Licitar Digital"],[/pncp\.gov/,"PNCP"]];
+function portalDe(site){
+  if(!site) return "sem portal (e-mail ou presencial)";
+  for(const [re, n] of PORTAIS) if(re.test(site)) return n;
+  try{ return new URL(site).hostname.replace(/^www\./, ""); }catch(e){ return String(site).slice(0, 40); }
+}
+// itens do boletim ("1 - Licença antivírus…", uma linha por item): conferidos com as mesmas regras dos itens do PNCP
+function itensCL(txt){
+  const m = {};
+  for(const linha of String(txt || "").split(/\n+/)){
+    const t = linha.trim(); if(!t) continue;
+    const mm = t.match(/^(\d+)\s*[-–.)]\s*(.*)$/);
+    const desc = (mm ? mm[2] : t).replace(/\s+/g, " ");
+    const n = norm(desc.slice(0, 100));
+    for(const cat of Object.keys(CATS)) if(itemCasa(cat, n)) (m[cat] = m[cat] || []).push([mm ? mm[1] : "–", desc.slice(0, 140), null, null, null]);
+  }
+  for(const k in m) m[k] = m[k].slice(0, 5);
+  return m;
+}
+function mesclarExternos(mapa){
+  const agora = Date.now();
+  for(const e of externos){
+    const fim = e.prazo ? new Date(e.prazo) : null;
+    const clIt = { cl_id: e.bidding_id, cl_site: e.site || null, cl_edital: e.edital || null, cl_processo: e.processo || null,
+                   cl_situacao: e.situacao || null, cl_resumo: !!e.tem_resumo, cl_itens: e.itens ? e.itens.slice(0, 600) : null };
+    const pid = e.pncp;
+    const ja = (pid && mapa.get(pid)) || mapa.get(e.id);
+    if(ja){ Object.assign(ja.it, clIt); continue; }        // a busca do PNCP já achou: só ganha o selo e o link
+    if(fim && fim.getTime() < agora) continue;
+    if(SIT_FORA.test(e.situacao || "")) continue;
+    const it = { orgao_nome: e.orgao, municipio_nome: e.cidade, uf: e.uf, description: e.objeto, title: "",
+                 modalidade_licitacao_nome: e.modalidade, usuario_nome: portalDe(e.site), codigo_ibge: e.codigo_ibge, valor_global: e.valor || null, ...clIt };
+    const m = pid && pid.match(/^(\d{14})-\d-0*(\d+)\/(\d{4})$/);
+    if(m) Object.assign(it, { orgao_cnpj: m[1], ano: +m[3], numero_sequencial: +m[2], item_url: "/compras/" + m[1] + "/" + m[3] + "/" + m[2] });
+    const id = m ? pid : e.id;
+    const km = e.codigo_ibge != null ? MUN[String(e.codigo_ibge)] : undefined;
+    const rec = { id, it, km: km === undefined ? null : km, fim, ini: null, n: norm(e.objeto || ""), cats: new Set(), strong: new Set(), strongItens: null, itens: null };
+    for(const cat of Object.keys(CATS)) if(forteEm(cat, rec.n)){ rec.strong.add(cat); rec.cats.add(cat); }
+    if(!m || e.itens){ const mi = itensCL(e.itens); aplicaItens(rec, mi); Object.keys(mi).forEach(c => rec.cats.add(c)); }
+    else { const c = itensCache[id]; if(c && Date.now() - c.t < ITENS_TTL) aplicaItens(rec, c.m); }
+    mapa.set(id, rec);
+  }
+}
+async function carregarExternos(){
+  if(!API || !apiOk) return;
+  try{
+    const r = await fetchT("/api/externos", { cache:"no-store" }, 20000);
+    if(!r.ok) return;
+    const j = await r.json(); externos = j.externos || []; estadoCL = j.estado || null;
+    mesclarExternos(items); preencheUFs(); treinar(); renderDepois(50);
+  }catch(e){}
+  mostraCL();
+}
+// a rodada agendada lê os boletins na aba do ConLicitação e abre esta página com #conlicitacao=<pacote gzip em base64url>;
+// o pacote só entra no banco quando alguém (ou a rodada) confirma em "Importar"
+let importCL = null;
+async function lerHashCL(){
+  const m = location.hash.match(/^#conlicitacao=([A-Za-z0-9_-]+)$/);
+  if(!m) return;
+  history.replaceState(null, "", location.pathname + location.search);
+  try{
+    const b64 = m[1].replace(/-/g, "+").replace(/_/g, "/");
+    const bin = atob(b64 + "===".slice((b64.length + 3) % 4));
+    const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+    const txt = await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"))).text();
+    const p = JSON.parse(txt);
+    if(!p || !Array.isArray(p.itens) || !Array.isArray(p.boletins)) throw new Error("formato inesperado");
+    importCL = p; window.__clImport = { estado: "aguardando", itens: p.itens.length, boletins: p.boletins.length };
+  }catch(e){ importCL = null; window.__clImport = { estado: "erro", erro: "o pacote dos boletins veio incompleto ou corrompido (" + e.message + ")" }; }
+  mostraCL();
+}
+async function importarCL(){
+  const p = importCL; if(!p) return window.__clImport || { estado: "nada" };
+  window.__clImport = { estado: "enviando" }; mostraCL();
+  try{
+    const r = await fetchT("/api/externos", { method:"PUT", headers:{"content-type":"application/json"},
+      body: JSON.stringify({ fonte: "conlicitacao", boletins: p.boletins, itens: p.itens }) }, 90000);
+    const j = await r.json().catch(() => ({}));
+    if(!r.ok) throw new Error(j.erro || ("HTTP " + r.status));
+    importCL = null; window.__clImport = { estado: "ok", recebidas: j.recebidas, novas: j.novas, atualizadas: j.atualizadas, sem_cidade: j.sem_cidade };
+    toast("ConLicitação: " + j.recebidas + " licitações importadas (" + j.novas + " novas)");
+    await carregarExternos();
+  }catch(e){ window.__clImport = { estado: "erro", erro: e.message }; }
+  mostraCL();
+  return window.__clImport;
+}
+function mostraCL(){
+  const el = $("#avisoCL"); if(!el) return;
+  const ed = (estadoCL && estadoCL.ultimos_boletins || []).slice(-1)[0];
+  const info = $("#clInfo");
+  if(info) info.textContent = estadoCL && estadoCL.ultima_importacao
+    ? " ConLicitação: " + externos.length + " licitações em aberto no banco · última importação " + new Date(estadoCL.ultima_importacao).toLocaleString("pt-BR", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" }) + (ed ? " (boletim nº " + ed + ")" : "") + "."
+    : "";
+  const st = window.__clImport;
+  let h = "", cls = "aviso-docs";
+  if(importCL){
+    const eds = importCL.boletins.map(b => b.edicao || b.id);
+    h = '<b>Boletins do ConLicitação recebidos</b> (nº ' + esc(eds.join(", ")) + '): ' + importCL.itens.length + ' licitações. ' +
+        '<button class="mark go" type="button" id="clImportar">Importar</button> <button class="mark" type="button" id="clIgnorar">Ignorar</button>';
+  } else if(st && st.estado === "enviando") h = "Importando os boletins do ConLicitação…";
+  else if(st && st.estado === "erro"){ h = "<b>ConLicitação:</b> " + esc(st.erro); cls += " amber"; }
+  else if(estadoCL && estadoCL.erro){ h = "<b>ConLicitação:</b> a última leitura dos boletins falhou (" + esc(estadoCL.erro) + "). Se a sessão expirou, entre de novo no ConLicitação pelo navegador do app do Claude."; cls += " amber"; }
+  el.className = cls; el.hidden = !h; el.innerHTML = h;
+}
+document.addEventListener("click", e => {
+  if(e.target.id === "clImportar") importarCL();
+  else if(e.target.id === "clIgnorar"){ importCL = null; window.__clImport = { estado: "ignorado" }; mostraCL(); }
+});
 
 // cópias dos editais marcados: renova com os dados atuais; marcação antiga sem cópia ganha uma e sobe para o banco
 function atualizaSnaps(){
@@ -652,6 +771,7 @@ function filtros(){
     ordem: $("#ordem").value,
     fracos: $("#fracos").checked,
     soLD: $("#soLD").checked,
+    soCL: $("#soCL").checked,
     ocultarProv: $("#ocultarProv").checked,
     q: norm($("#busca").value.trim())
   };
@@ -659,7 +779,7 @@ function filtros(){
 const isLD = rec => /licitar digital/i.test(rec.it.usuario_nome || "") || /licitardigital/i.test(((details.get(rec.id)||{}).linkSistemaOrigem) || rec._origem || "");
 function diasAte(d){ if(!d) return null; return Math.ceil((d.getTime() - Date.now())/86400000); }
 // suporte respeita o raio do suporte; as demais frentes, o alcance escolhido
-const dentro = (rec, c, f) => rec.km <= (c === "sup" ? f.supRaio : f.alcance);
+const dentro = (rec, c, f) => rec.km == null ? (c !== "sup" && f.alcance >= 99999) : rec.km <= (c === "sup" ? f.supRaio : f.alcance);
 const passaUF = (rec, f) => !f.uf || rec.it.uf === f.uf;
 const elegiveis = (rec, f) => [...conf(rec)].filter(c => f.ativas.has(c) && dentro(rec, c, f));
 function passaTexto(rec, q){ if(!q) return true; return (rec.n + " " + norm(rec.it.orgao_nome) + " " + norm(rec.it.municipio_nome) + " " + norm(rec.it.unidade_nome)).includes(q); }
@@ -683,6 +803,7 @@ function listaAbertos(f, todos){
     const fraco = !forte && [...rec.cats].some(c => f.ativas.has(c) && dentro(rec, c, f));
     if(!forte && !(fraco && f.fracos)) continue;
     if(f.soLD && !isLD(rec)) continue;
+    if(f.soCL && !rec.it.cl_id) continue;
     if(!passaTexto(rec, f.q)) continue;
     const p = marks[rec.id] ? null : pontua(rec);
     if(f.ocultarProv && p != null && p < 0.3) continue;
@@ -731,7 +852,8 @@ function visiveis(){
 function fmtData(d){ return d ? d.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"}) + " " + d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}) : "—"; }
 function fmtValor(v){ return (v && v > 0) ? v.toLocaleString("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:0}) : null; }
 function plataforma(rec){ const d = details.get(rec.id); if(isLD(rec)) return "Licitar Digital"; return (d && d.usuarioNome) || rec.it.usuario_nome || "—"; }
-function linkPncp(rec){ const u = rec.it.item_url || ""; return "https://pncp.gov.br/app/editais" + u.replace(/^\/compras/,""); }
+function linkPncp(rec){ const u = rec.it.item_url || ""; return u ? "https://pncp.gov.br/app/editais" + u.replace(/^\/compras/,"") : ""; }
+const linkCL = rec => rec.it.cl_id ? "https://consulteonline.conlicitacao.com.br/biddings/" + rec.it.cl_id : "";
 function itensDe(rec, cats){
   if(!rec.itens) return [];
   const vistos = new Set(), out = [];
@@ -767,6 +889,8 @@ function card(v){
   for(const c of confirmadas) pills.push('<span class="pill">' + esc(nomeCat(c)) + (rec.strong.has(c) ? "" : ' <small>· nos itens</small>') + '</span>');
   if(!forte){ const ff = filtros(); for(const c of rec.cats) if(ff.ativas.has(c) && dentro(rec, c, ff)) pills.push('<span class="pill ghost">possível · ' + esc(nomeCat(c)) + '</span>'); }
   if(isLD(rec)) pills.push('<span class="pill lime">Licitar Digital</span>');
+  if(it.cl_id) pills.push('<span class="pill cl">ConLicitação</span>');
+  if(it.cl_situacao && !/^(nova|urgente)$/i.test(it.cl_situacao)) pills.push('<span class="pill ' + (/suspens|revogad|anulad/i.test(it.cl_situacao) ? 'warn' : 'ghost') + '">' + esc(it.cl_situacao.toLowerCase()) + '</span>');
   if(p != null && p < 0.3) pills.push('<span class="pill warn">parece descarte</span>');
   else if(p != null && p > 0.7) pills.push('<span class="pill ok">parece interesse</span>');
   if(rec._snap) pills.push('<span class="pill ghost">' + (encerrado ? "encerrado" : "fora da busca atual") + '</span>');
@@ -794,7 +918,9 @@ function card(v){
     '<div class="foot">'+
       (valor ? '<span class="val">'+esc(valor)+'</span>' : '<span class="meta">valor não informado</span>')+
       '<span class="meta">'+esc(plataforma(rec))+'</span>'+
-      '<a href="'+esc(linkPncp(rec))+'" target="_blank" rel="noopener">Edital no PNCP ↗</a>'+origem+
+      (linkPncp(rec) ? '<a href="'+esc(linkPncp(rec))+'" target="_blank" rel="noopener">Edital no PNCP ↗</a>' : '')+origem+
+      (it.cl_id ? '<a href="'+esc(linkCL(rec))+'" target="_blank" rel="noopener">ConLicitação ↗</a>' : '')+
+      (it.cl_id && !it.item_url && it.cl_site && !linkOrigem ? '<a href="'+esc(it.cl_site)+'" target="_blank" rel="noopener">Portal ↗</a>' : '')+
       '<span class="sp"></span>'+ botoes +
     '</div>' + (naPipe ? blocoPipeline(rec) : '') + (marca !== "descartado" || naPipe ? blocoAnalise(rec) : '') +
     (abrirMotivo === rec.id ? painelMotivo(rec.id) : '') +
@@ -878,6 +1004,7 @@ function render(){
   $("#nM365").textContent = noRaio.filter(v => tem(v.rec, c => c === "m365")).length;
   $("#nSup").textContent = noRaio.filter(v => tem(v.rec, c => c === "sup")).length;
   $("#nLD").textContent = noRaio.filter(v => isLD(v.rec)).length;
+  $("#nCL").textContent = noRaio.filter(v => v.rec.it.cl_id).length;
   const nInt = idsCom("interesse").length, nDesc = idsCom("descartado").length;
   const nTriagem = idsCom("interesse").filter(id => !particip.has(id)).length;
   const nPipe = [...particip.values()].filter(p => ATIVAS.has(p.etapa)).length;
@@ -918,7 +1045,7 @@ function render(){
     const inp = document.querySelector('.ed[data-id="' + CSS.escape(foco.id) + '"] .obs-in');
     if(inp){ inp.focus({ preventScroll: true }); try{ inp.setSelectionRange(foco.ini, foco.fim); }catch(e){} }
   }
-  carregarDetalhes(vis.slice(0, 120).map(v => v.rec).filter(r => !r._snap));
+  carregarDetalhes(vis.slice(0, 120).map(v => v.rec).filter(r => !r._snap && r.it.orgao_cnpj));
 }
 
 let detRun = 0;
@@ -1035,8 +1162,8 @@ document.querySelectorAll(".chip").forEach(b => b.addEventListener("click", () =
   b.setAttribute("aria-pressed", b.getAttribute("aria-pressed") !== "true"); salvaChips(); render(); if(items.size) verificarItens();
 }));
 ["#raioSup","#alcance","#uf"].forEach(s => $(s).addEventListener("change", () => { salvaFiltros(); render(); if(items.size) verificarItens(); }));
-["#ordem","#fracos","#soLD","#ocultarProv"].forEach(s => $(s).addEventListener("change", () => { salvaFiltros(); render(); }));
-function salvaFiltros(){ store.set("filtros", { raioSup:$("#raioSup").value, alcance:$("#alcance").value, uf:$("#uf").value, ordem:$("#ordem").value, fracos:$("#fracos").checked, soLD:$("#soLD").checked, ocultarProv:$("#ocultarProv").checked }); }
+["#ordem","#fracos","#soLD","#soCL","#ocultarProv"].forEach(s => $(s).addEventListener("change", () => { salvaFiltros(); render(); }));
+function salvaFiltros(){ store.set("filtros", { raioSup:$("#raioSup").value, alcance:$("#alcance").value, uf:$("#uf").value, ordem:$("#ordem").value, fracos:$("#fracos").checked, soLD:$("#soLD").checked, soCL:$("#soCL").checked, ocultarProv:$("#ocultarProv").checked }); }
 $("#busca").addEventListener("input", () => render());
 $("#btnAtualizar").addEventListener("click", () => { itensCache = {}; store.set("itens", {}); carregarServidor().then(buscar); });
 
@@ -1057,6 +1184,7 @@ function linhas(){
       abertura: fmtData(rec.ini), encerramento: fmtData(rec.fim), dias: diasAte(rec.fim),
       valor_estimado: d.valorTotalEstimado || it.valor_global || rec._valor || "", plataforma: plataforma(rec),
       processo: d.processo || "", numero_compra: d.numeroCompra || "",
+      fonte: it.cl_id ? (it.item_url ? "PNCP + ConLicitação" : "ConLicitação") : "PNCP", link_conlicitacao: linkCL(rec),
       link_pncp: linkPncp(rec), link_origem: d.linkSistemaOrigem || rec._origem || "", controle_pncp: rec.id,
       marcacao: marks[rec.id] || "", etapa_pipeline: particip.has(rec.id) ? nomeEtapa(particip.get(rec.id).etapa) : "",
       pasta_sharepoint: (particip.get(rec.id) || {}).pasta_url || "", motivo: marks[rec.id] === "descartado" ? nomeMotivo(mo.m) : "", obs: mo.obs || "",
@@ -1081,7 +1209,7 @@ $("#btnZap").addEventListener("click", async () => {
   const txt = "*" + titulo + " · Nano TI* (" + new Date().toLocaleDateString("pt-BR") + ")\n\n" + rows.map(r =>
     "• " + (r.etapa_pipeline ? "[" + r.etapa_pipeline + "] " : "") + "*" + r.frentes + "* — " + r.orgao + " (" + r.municipio + "/" + r.uf + ", " + r.km + " km)\n  Encerra " + r.encerramento + (r.valor_estimado ? " · " + fmtValor(+r.valor_estimado) : "") + " · " + r.plataforma +
     (r.motivo ? "\n  Motivo: " + r.motivo + (r.obs ? " — " + r.obs : "") : "") +
-    (r.itens_encontrados ? "\n  " + r.itens_encontrados.split(" | ")[0] : "") + "\n  " + r.link_pncp
+    (r.itens_encontrados ? "\n  " + r.itens_encontrados.split(" | ")[0] : "") + "\n  " + (r.link_pncp || r.link_conlicitacao)
   ).join("\n\n");
   try{ await navigator.clipboard.writeText(txt); toast("Copiado — cole no WhatsApp"); }
   catch(e){ const ta=document.createElement("textarea"); ta.value=txt; document.body.appendChild(ta); ta.select(); try{ document.execCommand("copy"); toast("Copiado — cole no WhatsApp"); }catch(_){ toast("Não consegui copiar"); } ta.remove(); }
@@ -1093,7 +1221,7 @@ if(fs){
   if(fs.raioSup) $("#raioSup").value = fs.raioSup;
   if(fs.alcance) $("#alcance").value = fs.alcance;
   if(fs.ordem) $("#ordem").value = fs.ordem;
-  $("#fracos").checked = !!fs.fracos; $("#soLD").checked = !!fs.soLD; $("#ocultarProv").checked = !!fs.ocultarProv;
+  $("#fracos").checked = !!fs.fracos; $("#soLD").checked = !!fs.soLD; $("#soCL").checked = !!fs.soCL; $("#ocultarProv").checked = !!fs.ocultarProv;
 }
 catsAtivas();
 atualizaSync();
@@ -1117,7 +1245,11 @@ const textoDoc = new Map();
 const PROXY = "/api/pncp-proxy/";
 function compraPath(id){
   const s = (filaSnaps.get(id) || snaps[id] || {}); const it = s.it || {};
-  if(!it.orgao_cnpj){ const m = String(id).match(/^(\d{14})-\d+-0*(\d+)\/(\d{4})$/); if(m) return "orgaos/" + m[1] + "/compras/" + m[3] + "/" + m[2]; throw new Error("edital sem CNPJ/ano/sequencial: " + id); }
+  if(!it.orgao_cnpj){
+    const m = String(id).match(/^(\d{14})-\d+-0*(\d+)\/(\d{4})$/); if(m) return "orgaos/" + m[1] + "/compras/" + m[3] + "/" + m[2];
+    if(/^CL-\d+$/.test(id)) throw new Error("edital só no ConLicitação (não está no PNCP): use o resumo e o edital pela aba do ConLicitação");
+    throw new Error("edital sem CNPJ/ano/sequencial: " + id);
+  }
   return "orgaos/" + it.orgao_cnpj + "/compras/" + it.ano + "/" + it.numero_sequencial;
 }
 async function pdfTexto(buf){
@@ -1160,8 +1292,11 @@ function dadosSnap(id, snap){
   const it = (snap && snap.it) || {};
   return { id, orgao: it.orgao_nome, unidade: it.unidade_nome, municipio: it.municipio_nome, uf: it.uf, km: snap && snap.km,
            objeto: (it.description || it.title || "").replace(/^\[[^\]]+\]\s*-\s*/, ""), encerramento: snap && snap.fim, plataforma: it.usuario_nome,
-           valor_estimado: snap && snap.valor, link_pncp: "https://pncp.gov.br/app/editais" + String(it.item_url || "").replace(/^\/compras/, ""),
-           link_origem: snap && snap.origem, itens_encontrados: snap && snap.itens };
+           valor_estimado: snap && snap.valor, link_pncp: it.item_url ? "https://pncp.gov.br/app/editais" + String(it.item_url).replace(/^\/compras/, "") : null,
+           link_origem: snap && snap.origem, itens_encontrados: snap && snap.itens,
+           ...(it.cl_id ? { conlicitacao_id: it.cl_id, so_conlicitacao: !it.item_url, link_conlicitacao: "https://consulteonline.conlicitacao.com.br/biddings/" + it.cl_id,
+               resumo_conlicitacao_disponivel: !!it.cl_resumo, portal: it.cl_site || null, edital: it.cl_edital, processo: it.cl_processo,
+               situacao_conlicitacao: it.cl_situacao, itens_conlicitacao: it.cl_itens } : {}) };
 }
 // nome da pasta no padrão da Nano: "ÓRGÃO-UF - MODALIDADE Nº 011.2026 - PROCESSO 022.2026"
 function nomePastaDe(det, it){
@@ -1172,10 +1307,11 @@ function nomePastaDe(det, it){
   const uf = ((det.unidadeOrgao && det.unidadeOrgao.ufSigla) || it.uf || "").toUpperCase();
   const mn = semAcento(det.modalidadeNome || it.modalidade_licitacao_nome || "").toLowerCase();
   const mod = /preg/.test(mn) ? "PREGÃO" : /dispensa/.test(mn) ? "DISPENSA" : /concorr/.test(mn) ? "CONCORRÊNCIA" : /inexig/.test(mn) ? "INEXIGIBILIDADE"
-            : /credenc/.test(mn) ? "CREDENCIAMENTO" : /leil/.test(mn) ? "LEILÃO" : (det.modalidadeNome || "COMPRA").toUpperCase();
-  const ano = String(det.anoCompra || it.ano || new Date().getFullYear());
-  const num = String(det.numeroCompra || it.numero_sequencial || "").replace(/\/\d{4}$/, "").trim();
-  const proc = String(det.processo || "").trim().replace(/\//g, ".");
+            : /credenc/.test(mn) ? "CREDENCIAMENTO" : /leil/.test(mn) ? "LEILÃO" : (det.modalidadeNome || it.modalidade_licitacao_nome || "COMPRA").toUpperCase();
+  const ed = String(it.cl_edital || "").match(/(\d+)\s*[\/.-]\s*(\d{4})\s*$/);   // ConLicitação: "PE/12/2026", "DL/18/2026"
+  const ano = String(det.anoCompra || (ed && ed[2]) || it.ano || new Date().getFullYear());
+  const num = String(det.numeroCompra || (ed && ed[1]) || it.numero_sequencial || "").replace(/\/\d{4}$/, "").trim();
+  const proc = String(det.processo || it.cl_processo || "").trim().replace(/\//g, ".");
   let nome = org + (uf && !org.endsWith("-" + uf) ? "-" + uf : "") + " - " + mod + (num ? " Nº " + num + "." + ano : "") + (proc ? " - PROCESSO " + proc : "");
   nome = nome.replace(/[\\/:*?"<>|#%]/g, "-").replace(/\s+/g, " ").replace(/[. ]+$/, "").trim();
   return nome.length > 180 ? nome.slice(0, 180).trim() : nome;
@@ -1187,7 +1323,19 @@ async function apiPart(caminho, metodo, corpo){
   return r.json();
 }
 window.nanoAnalise = {
-  versao: 4,
+  versao: 5,
+  // ---- ConLicitação: onde a próxima leitura dos boletins começa e o registro de falhas
+  async conlicitacao(){
+    const r = await fetchT("/api/externos/estado", { cache:"no-store" }, 20000);
+    if(!r.ok) throw new Error("estado do ConLicitação respondeu " + r.status);
+    return r.json();
+  },
+  // depois que a rodada abre esta página com #conlicitacao=…: grava o pacote no banco e devolve {estado, recebidas, novas…}
+  async importarConlicitacao(){ for(let i = 0; i < 20 && !importCL && !window.__clImport; i++) await new Promise(r => setTimeout(r, 250)); return importarCL(); },
+  async conlicitacaoFalhou(erro){
+    await fetchT("/api/externos/estado", { method:"PUT", headers:{"content-type":"application/json"}, body: JSON.stringify({ erro: String(erro).slice(0, 500) }) }, 20000);
+    if(estadoCL) estadoCL.erro = String(erro); mostraCL(); return true;
+  },
   async fila(){
     const r = await fetchT("/api/analises", { cache:"no-store" }, 20000);
     if(!r.ok) throw new Error("API de análises respondeu " + r.status);
@@ -1258,8 +1406,11 @@ window.nanoAnalise = {
   },
   async nomePasta(id){
     const s = filaSnaps.get(id) || snaps[id] || (particip.get(id) || {}).snap || {};
-    const det = await this.detalhe(id);
-    return { nome: nomePastaDe(det && !det.erro ? det : null, s.it), numero_compra: det && det.numeroCompra, processo: det && det.processo, modalidade: det && det.modalidadeNome };
+    let det = null;
+    if(!/^CL-/.test(id)){ try{ det = await this.detalhe(id); }catch(e){ det = null; } }
+    const ok = det && !det.erro ? det : null, it = s.it || {};
+    return { nome: nomePastaDe(ok, it), numero_compra: (ok && ok.numeroCompra) || it.cl_edital || null, processo: (ok && ok.processo) || it.cl_processo || null,
+             modalidade: (ok && ok.modalidadeNome) || it.modalidade_licitacao_nome || null };
   },
   async preAnalise(id){
     const r = await fetchT("/api/analises/" + encodeURIComponent(id), { cache:"no-store" }, 20000);
@@ -1294,5 +1445,7 @@ window.nanoAnalise = {
   async arquivoFalhou(id, erro){ await apiPart("/" + encodeURIComponent(id) + "/arquivo", "PUT", { status: "erro", erro: String(erro).slice(0, 1500) }); return true; }
 };
 
+lerHashCL();
+window.addEventListener("hashchange", lerHashCL);
 carregarServidor().then(() => { treinar(); render(); });
 buscar().catch(e => { running=false; $("#btnAtualizar").disabled=false; setStatus("Falha ao consultar o PNCP: " + e.message); $("#lista").innerHTML = '<div class="empty">Não consegui falar com o PNCP. Confira a internet e clique em Atualizar.</div>'; });

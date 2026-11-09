@@ -12,6 +12,8 @@ Marcações de interesse e descarte (com motivo) ficam num banco D1 e alimentam 
 - `src/parts/regras.js` — termos de busca e regras de relevância por frente (Sophos por linha, backup, Microsoft, suporte).
 - `src/parts/app.js` — busca no PNCP, conferência de itens, marcações, aprendizado e tela.
 - `src/mun_br.json` — distância em km de Leme/SP para cada município (código IBGE).
+- `src/mun_nome.json` — "UF|nome do município sem acento" → código IBGE (usado pelo Worker para pôr a distância nas licitações do ConLicitação).
+- `ferramentas/conlicitacao_boletins.js` — script que a rodada roda na aba do ConLicitação para ler os boletins (também está no fim do prompt da rodada).
 - `src/worker.js` — Worker: serve `public/` e a API de marcações no D1.
 - `build.mjs` — monta `public/index.html` (`node build.mjs`). Rode antes de cada commit.
 - `wrangler.jsonc` — Worker `editais-nano`, assets em `public/`, banco D1 `editais-nano` (binding `DB`, criado no primeiro deploy).
@@ -31,6 +33,21 @@ Marcações de interesse e descarte (com motivo) ficam num banco D1 e alimentam 
   Cache no D1 (`cache_pncp`): itens 12 h, dados da compra 6 h, lista de arquivos 1 h; cópia vencida (até 7 dias) é servida
   quando o PNCP limita (429) ou cai (5xx). Ao receber 429 a API daquela família pausa 5 min (5xx/timeout: 2 min) — header `x-pncp-pausa`.
   Downloads de documentos não são guardados.
+
+- `GET /api/externos` — licitações dos boletins do ConLicitação ainda abertas + estado da importação; `PUT /api/externos` grava
+  `{fonte:"conlicitacao", boletins:[{id, edicao, fechado_em}], itens:[…campos do boletim]}` (o boletim mais novo prevalece).
+  `GET|PUT /api/externos/estado` — ponto de partida da próxima leitura (`ultimo_boletim`) e falha registrada pela rodada.
+
+## ConLicitação (v7.7)
+A Nano assina os boletins do ConLicitação (uso interno, por contrato). A rodada agendada, no navegador do app (sessão do ConLicitação
+já logada), roda `ferramentas/conlicitacao_boletins.js` numa aba do ConLicitação: o script segue a cadeia de boletins a partir do
+último importado, junta as licitações ainda abertas, compacta (gzip + base64url) e abre o monitor nessa aba com `#conlicitacao=<pacote>`.
+O monitor mostra "Boletins recebidos… Importar"; a rodada confirma com `nanoAnalise.importarConlicitacao()`. Nada passa por fora do
+navegador e o pacote só entra no banco com a confirmação.
+Na lista: licitação com Id do PNCP usa o número de controle do PNCP (não duplica o que a busca já achou; itens e documentos vêm do PNCP);
+sem PNCP, o id é `CL-<nº ConLicitação>` e o card tem link para o ConLicitação e para o portal. As mesmas regras de frente, distância
+e prazo valem para as duas fontes; revogadas/anuladas ficam fora. A pré-análise de um edital só no ConLicitação usa o resumo do edital
+do próprio ConLicitação (`/chatbots/bidding_chat/bidding_summary?conlicitacao_id=`), e o texto da análise diz isso.
 
 ## Limites do PNCP
 - A busca (`/api/search`) vai direto do navegador; itens e dados da compra passam pelo servidor (cache compartilhado entre aparelhos)

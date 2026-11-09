@@ -75,8 +75,56 @@ const SCHEMA = [
      chave TEXT PRIMARY KEY,
      valor TEXT,
      atualizado_em TEXT NOT NULL
+   )`,
+  // licitações vindas de fora do PNCP (boletins do ConLicitação), importadas pela rodada agendada.
+  // Uso interno da Nano: o conteúdo dos boletins não é repassado a terceiros.
+  `CREATE TABLE IF NOT EXISTS externos (
+     id TEXT PRIMARY KEY,
+     fonte TEXT NOT NULL,
+     pncp_id TEXT,
+     prazo TEXT,
+     situacao TEXT,
+     boletim INTEGER,
+     dados TEXT NOT NULL,
+     criado_em TEXT NOT NULL,
+     atualizado_em TEXT NOT NULL
    )`
 ];
+
+// ---- ConLicitação: normalização dos boletins (os campos chegam como a API do boletim devolve)
+import MUN_NOME from "./mun_nome.json";   // "UF|nome normalizado" -> código IBGE
+const semAcento = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "");
+const chaveCidade = (uf, cidade) => String(uf || "").toUpperCase().trim() + "|" + semAcento(cidade).toLowerCase().replace(/['’]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+function pncpIdDe(x) {
+  const m = String(x.observacao || "").match(/Id contrata[çc][ãa]o PNCP:\s*(\d{14})-(\d)-0*(\d+)\/(\d{4})/i);
+  if (m) return m[1] + "-" + m[2] + "-" + m[3].padStart(6, "0") + "/" + m[4];
+  const s = String(x.edital_site || "").match(/pncp\.gov\.br\/(?:app\/)?editais\/(\d{14})\/(\d{4})\/(\d+)/);
+  if (s) return s[1] + "-1-" + s[3].padStart(6, "0") + "/" + s[2];
+  return null;
+}
+const dataIso = (v) => { if (!v) return null; const d = new Date(v); return isNaN(d) ? null : d.toISOString(); };
+// prazo para a proposta: abertura da sessão; sem ela, o limite de proposta/documentos; por último a validade do aviso (fim do dia)
+const prazoCL = (x) => dataIso(x.datahora_abertura) || dataIso(x.datahora_prazo) || dataIso(x.datahora_documento) ||
+  (x.data_validade ? dataIso(String(x.data_validade).slice(0, 10) + "T23:59:00-03:00") : null);
+const limpaObjeto = (s) => String(s || "").replace(/\*\s*(Licita[çc][ãa]o eletr[ôo]nica|Registro de pre[çc]os)\s*\*/gi, " ")
+  .replace(/\*\s*https?:\/\/\S+\s*\*/g, " ").replace(/\s+/g, " ").trim();
+function normalizaCL(x, boletim) {
+  const bid = Number(x.bidding_id);
+  if (!Number.isInteger(bid) || bid <= 0) return null;
+  const uf = texto(x.orgao_estado, 2);
+  const ibge = MUN_NOME[chaveCidade(uf, x.orgao_cidade)] || null;
+  return {
+    id: "CL-" + bid, bidding_id: bid, pncp: pncpIdDe(x),
+    orgao: texto(x.orgao || x.orgao_nome, 300), uasg: texto(x.orgao_uasg, 20), classe: texto(x.orgao_classe, 80),
+    cidade: texto(x.orgao_cidade, 120), uf, codigo_ibge: ibge,
+    edital: texto(x.edital, 80), processo: texto(x.processo, 80), modalidade: texto(x.modalidade, 80),
+    objeto: texto(limpaObjeto(x.objeto), 3000), itens: texto(String(x.itens || "").replace(/\r/g, "").trim(), 4000),
+    valor: numero(x.valor_estimado) || null, prazo: prazoCL(x), abertura: dataIso(x.datahora_abertura),
+    site: texto(x.edital_site, 1000), situacao: texto(x.situacao, 40), obs: texto(x.observacao, 1500),
+    tem_resumo: !!x.has_summary, tem_edital: !!x.tem_edital, atualizado: dataIso(x.updated_at),
+    boletim: Number(boletim && boletim.id) || null, edicao: Number(boletim && boletim.edicao) || null
+  };
+}
 
 const ETAPAS = new Set(["participar", "proposta", "ganhamos", "perdemos", "desistimos"]);
 const STATUS_PASTA = new Set(["pendente", "criando", "pronta", "erro"]);
@@ -261,6 +309,94 @@ export default {
            ON CONFLICT(chave) DO UPDATE SET valor = ?1, atualizado_em = ?2`
         ).bind(JSON.stringify({ nomes, pasta_url: texto(b.pasta_url, 1000) }), new Date().toISOString()).run();
         return json({ ok: true, total: nomes.length });
+      }
+      return json({ erro: "método não permitido" }, 405);
+    }
+
+    // ---- licitações de fora do PNCP (boletins do ConLicitação)
+    // PUT /api/externos {fonte:"conlicitacao", boletins:[{id, edicao, fechado_em}], itens:[...]}: grava/atualiza (a página manda o que a rodada trouxe)
+    // GET /api/externos: as que ainda não venceram + o estado da importação; GET|PUT /api/externos/estado: ponto de partida da próxima rodada / falha
+    if (url.pathname === "/api/externos" || url.pathname === "/api/externos/estado") {
+      const lerEstado = async () => {
+        const r = await env.DB.prepare("SELECT valor, atualizado_em FROM ajustes WHERE chave = 'conlicitacao'").first();
+        return r ? { ...(parseJ(r.valor) || {}), atualizado_em: r.atualizado_em } : {};
+      };
+      const gravaEstado = (v) => env.DB.prepare(
+        `INSERT INTO ajustes (chave, valor, atualizado_em) VALUES ('conlicitacao', ?1, ?2) ON CONFLICT(chave) DO UPDATE SET valor = ?1, atualizado_em = ?2`
+      ).bind(JSON.stringify(v), new Date().toISOString()).run();
+      if (url.pathname === "/api/externos/estado") {
+        if (request.method === "GET") return json(await lerEstado());
+        if (request.method === "PUT") {
+          const b = await request.json().catch(() => null);
+          if (!b) return json({ erro: "json inválido" }, 400);
+          const est = await lerEstado(); delete est.atualizado_em;
+          est.erro = b.erro ? texto(b.erro, 500) : null; est.erro_em = b.erro ? new Date().toISOString() : null;
+          await gravaEstado(est);
+          return json({ ok: true });
+        }
+        return json({ erro: "método não permitido" }, 405);
+      }
+      if (request.method === "GET") {
+        // vencidas há mais de 2 dias saem da lista (as marcadas continuam pela cópia guardada na marcação)
+        const corte = new Date(Date.now() - 2 * 86400000).toISOString();
+        const { results } = await env.DB.prepare(
+          "SELECT dados FROM externos WHERE prazo IS NULL OR prazo >= ?1 ORDER BY prazo"
+        ).bind(corte).all();
+        if (Math.random() < 0.05) {
+          ctx.waitUntil(env.DB.prepare("DELETE FROM externos WHERE prazo < ?1").bind(new Date(Date.now() - 60 * 86400000).toISOString()).run());
+        }
+        return json({ externos: results.map((r) => parseJ(r.dados)).filter(Boolean), estado: await lerEstado() });
+      }
+      if (request.method === "PUT") {
+        const raw = await request.text();
+        if (raw.length > 8000000) return json({ erro: "importação grande demais" }, 413);
+        let b; try { b = JSON.parse(raw); } catch { return json({ erro: "json inválido" }, 400); }
+        if (!b || b.fonte !== "conlicitacao" || !Array.isArray(b.itens) || !Array.isArray(b.boletins)) return json({ erro: "envie {fonte:'conlicitacao', boletins:[...], itens:[...]}" }, 400);
+        if (b.itens.length > 3000 || b.boletins.length > 60) return json({ erro: "importação grande demais" }, 413);
+        const boletins = b.boletins.map((x) => ({ id: Number(x && x.id), edicao: Number(x && x.edicao) || null, fechado_em: dataIso(x && x.fechado_em) }))
+          .filter((x) => Number.isInteger(x.id) && x.id > 0);
+        const porId = new Map(boletins.map((x) => [x.id, x]));
+        const agoraE = new Date().toISOString();
+        const linhas = new Map();
+        for (const x of b.itens) {
+          if (!x || typeof x !== "object") continue;
+          const d = normalizaCL(x, porId.get(Number(x._b)));
+          if (!d) continue;
+          const ant = linhas.get(d.id);
+          if (!ant || (d.boletim || 0) >= (ant.boletim || 0)) linhas.set(d.id, d);   // o boletim mais novo vale
+        }
+        const lista = [...linhas.values()];
+        let novos = 0;
+        if (lista.length) {
+          const existentes = new Set();
+          for (let i = 0; i < lista.length; i += 90) {
+            const parte = lista.slice(i, i + 90);
+            const { results } = await env.DB.prepare("SELECT id FROM externos WHERE id IN (" + parte.map((_, k) => "?" + (k + 1)).join(",") + ")")
+              .bind(...parte.map((d) => d.id)).all();
+            results.forEach((r) => existentes.add(r.id));
+          }
+          novos = lista.filter((d) => !existentes.has(d.id)).length;
+          const stmts = lista.map((d) => env.DB.prepare(
+            `INSERT INTO externos (id, fonte, pncp_id, prazo, situacao, boletim, dados, criado_em, atualizado_em)
+             VALUES (?1, 'conlicitacao', ?2, ?3, ?4, ?5, ?6, ?7, ?7)
+             ON CONFLICT(id) DO UPDATE SET
+               pncp_id = CASE WHEN COALESCE(externos.boletim, 0) <= ?5 THEN ?2 ELSE externos.pncp_id END,
+               prazo = CASE WHEN COALESCE(externos.boletim, 0) <= ?5 THEN ?3 ELSE externos.prazo END,
+               situacao = CASE WHEN COALESCE(externos.boletim, 0) <= ?5 THEN ?4 ELSE externos.situacao END,
+               dados = CASE WHEN COALESCE(externos.boletim, 0) <= ?5 THEN ?6 ELSE externos.dados END,
+               boletim = MAX(COALESCE(externos.boletim, 0), ?5), atualizado_em = ?7`
+          ).bind(d.id, d.pncp, d.prazo, d.situacao, d.boletim || 0, JSON.stringify(d), agoraE));
+          for (let i = 0; i < stmts.length; i += 80) await env.DB.batch(stmts.slice(i, i + 80));
+        }
+        const est = await lerEstado(); delete est.atualizado_em;
+        const maisNovo = boletins.reduce((a, x) => (!a || x.id > a.id ? x : a), null);
+        if (maisNovo && (!est.ultimo_boletim || maisNovo.id >= est.ultimo_boletim)) {
+          est.ultimo_boletim = maisNovo.id; est.ultima_edicao = maisNovo.edicao; est.ultimo_fechado_em = maisNovo.fechado_em;
+        }
+        est.ultima_importacao = agoraE; est.ultimos_boletins = boletins.map((x) => x.edicao || x.id).slice(-20);
+        est.recebidas = lista.length; est.novas = novos; est.erro = null; est.erro_em = null;
+        await gravaEstado(est);
+        return json({ ok: true, recebidas: lista.length, novas: novos, atualizadas: lista.length - novos, sem_cidade: lista.filter((d) => !d.codigo_ibge).length, estado: est });
       }
       return json({ erro: "método não permitido" }, 405);
     }
