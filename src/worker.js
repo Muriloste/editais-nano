@@ -106,8 +106,8 @@ const dataIso = (v) => { if (!v) return null; const d = new Date(v); return isNa
 // prazo para a proposta: abertura da sessão; sem ela, o limite de proposta/documentos; por último a validade do aviso (fim do dia)
 const prazoCL = (x) => dataIso(x.datahora_abertura) || dataIso(x.datahora_prazo) || dataIso(x.datahora_documento) ||
   (x.data_validade ? dataIso(String(x.data_validade).slice(0, 10) + "T23:59:00-03:00") : null);
-const limpaObjeto = (s) => String(s || "").replace(/\*\s*(Licita[çc][ãa]o eletr[ôo]nica|Registro de pre[çc]os)\s*\*/gi, " ")
-  .replace(/\*\s*https?:\/\/\S+\s*\*/g, " ").replace(/\s+/g, " ").trim();
+const limpaObjeto = (s) => String(s || "").replace(/\*+\s*(https?:\/\/|www\.)[^*\s]+\s*\*+/gi, " ")
+  .replace(/\*\s+[^*]{2,40}?\s+\*/g, " ").replace(/\s+/g, " ").trim();   // tira as marcas "* Licitação Eletrônica *", "* www.portal *"
 function normalizaCL(x, boletim) {
   const bid = Number(x.bidding_id);
   if (!Number.isInteger(bid) || bid <= 0) return null;

@@ -352,9 +352,9 @@ const CATS = {
              itemNeg:/oxigenio|cilindro|medicinal|gerador|videomonitoramento|cftv|\bsom\b|audio/ },
   m365:    { grupo:"m365", nome:"Microsoft",
              terms:['"microsoft 365"','"office 365"','"licenças microsoft"','"licença microsoft"','"pacote office"','"exchange online"','"correio eletrônico"','"e-mail corporativo"','microsoft'],
-             re:/microsoft|\boffice\b|\bm365\b|exchange|correio eletronico|e-?mails? (corporativo|institucional)/, neg:/cadeira|poltrona/,
+             re:/microsoft|\boffice\b|\bm365\b|exchange|correio eletronico|e-?mails? (corporativo|institucional)/, neg:/cadeira|poltrona|office banking|home banking/,
              itemRe:/microsoft 365|\boffice\b|\bm365\b|exchange|licenca[^.]{0,40}microsoft|windows server/,
-             itemNeg:/cadeira|poltrona|curso|capacitacao|treinamento|^(notebook|computador|microcomputador|mini ?pc|desktop|all in one|tablet|smartphone|celular|estacao de trabalho)/ },
+             itemNeg:/cadeira|poltrona|banking|curso|capacitacao|treinamento|^(notebook|computador|microcomputador|mini ?pc|desktop|all in one|tablet|smartphone|celular|estacao de trabalho)/ },
   sup:     { grupo:"sup", nome:"Suporte TI",
              terms:['"suporte técnico"','"help desk"','"service desk"','"manutenção de computadores"','"manutenção preventiva e corretiva"','"assistência técnica"','"outsourcing de ti"','"terceirização de ti"','"tecnologia da informação"','"infraestrutura de ti"','"rede lógica"','"gerenciamento de rede"'],
              forte: ehSuporte, itemFn: () => false }  // suporte é serviço: vale o objeto, não a ficha de item
@@ -926,28 +926,37 @@ function itensCL(txt){
   for(const k in m) m[k] = m[k].slice(0, 5);
   return m;
 }
+// o ConLicitação marca a origem no objeto ("* Licitação Eletrônica *", "* www.portal.gov.br *"): fora da tela
+const limpaObjCL = t => String(t || "").replace(/\*+\s*(https?:\/\/|www\.)[^*\s]+\s*\*+/gi, " ").replace(/\*\s+[^*]{2,40}?\s+\*/g, " ").replace(/\s+/g, " ").trim();
+// mesma licitação vinda de duas fontes (o ConLicitação às vezes lista o aviso do PNCP e o do portal do órgão): UF + cidade + começo do objeto
+const chaveObj = (uf, cid, obj) => (uf || "") + "|" + norm(cid).replace(/[^a-z]/g, "") + "|" + norm(String(obj || "").replace(/^\[[^\]]+\]\s*-\s*/, "")).replace(/[^a-z0-9]/g, "").slice(0, 60);
 function mesclarExternos(mapa){
   const agora = Date.now();
-  for(const e of externos){
+  const porChave = new Map();
+  for(const r of mapa.values()) porChave.set(chaveObj(r.it.uf, r.it.municipio_nome, r.it.description || r.it.title), r);
+  const ordem = [...externos].sort((a, b) => (b.pncp ? 1 : 0) - (a.pncp ? 1 : 0));   // os com Id do PNCP primeiro
+  for(const e of ordem){
+    const objeto = limpaObjCL(e.objeto);
     const fim = e.prazo ? new Date(e.prazo) : null;
     const clIt = { cl_id: e.bidding_id, cl_site: e.site || null, cl_edital: e.edital || null, cl_processo: e.processo || null,
                    cl_situacao: e.situacao || null, cl_resumo: !!e.tem_resumo, cl_itens: e.itens ? e.itens.slice(0, 600) : null };
     const pid = e.pncp;
-    const ja = (pid && mapa.get(pid)) || mapa.get(e.id);
-    if(ja){ Object.assign(ja.it, clIt); continue; }        // a busca do PNCP já achou: só ganha o selo e o link
+    const chave = chaveObj(e.uf, e.cidade, objeto);
+    const ja = (pid && mapa.get(pid)) || mapa.get(e.id) || porChave.get(chave);
+    if(ja){ if(!ja.it.cl_id || ja.id === e.id) Object.assign(ja.it, clIt); continue; }   // já está na lista (PNCP ou outro aviso): só ganha o selo e o link
     if(fim && fim.getTime() < agora) continue;
     if(SIT_FORA.test(e.situacao || "")) continue;
-    const it = { orgao_nome: e.orgao, municipio_nome: e.cidade, uf: e.uf, description: e.objeto, title: "",
+    const it = { orgao_nome: e.orgao, municipio_nome: e.cidade, uf: e.uf, description: objeto, title: "",
                  modalidade_licitacao_nome: e.modalidade, usuario_nome: portalDe(e.site), codigo_ibge: e.codigo_ibge, valor_global: e.valor || null, ...clIt };
     const m = pid && pid.match(/^(\d{14})-\d-0*(\d+)\/(\d{4})$/);
     if(m) Object.assign(it, { orgao_cnpj: m[1], ano: +m[3], numero_sequencial: +m[2], item_url: "/compras/" + m[1] + "/" + m[3] + "/" + m[2] });
     const id = m ? pid : e.id;
     const km = e.codigo_ibge != null ? MUN[String(e.codigo_ibge)] : undefined;
-    const rec = { id, it, km: km === undefined ? null : km, fim, ini: null, n: norm(e.objeto || ""), cats: new Set(), strong: new Set(), strongItens: null, itens: null };
+    const rec = { id, it, km: km === undefined ? null : km, fim, ini: null, n: norm(objeto), cats: new Set(), strong: new Set(), strongItens: null, itens: null };
     for(const cat of Object.keys(CATS)) if(forteEm(cat, rec.n)){ rec.strong.add(cat); rec.cats.add(cat); }
     if(!m || e.itens){ const mi = itensCL(e.itens); aplicaItens(rec, mi); Object.keys(mi).forEach(c => rec.cats.add(c)); }
     else { const c = itensCache[id]; if(c && Date.now() - c.t < ITENS_TTL) aplicaItens(rec, c.m); }
-    mapa.set(id, rec);
+    mapa.set(id, rec); porChave.set(chave, rec);
   }
 }
 async function carregarExternos(){

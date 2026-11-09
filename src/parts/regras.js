@@ -52,9 +52,9 @@ const CATS = {
              itemNeg:/oxigenio|cilindro|medicinal|gerador|videomonitoramento|cftv|\bsom\b|audio/ },
   m365:    { grupo:"m365", nome:"Microsoft",
              terms:['"microsoft 365"','"office 365"','"licenças microsoft"','"licença microsoft"','"pacote office"','"exchange online"','"correio eletrônico"','"e-mail corporativo"','microsoft'],
-             re:/microsoft|\boffice\b|\bm365\b|exchange|correio eletronico|e-?mails? (corporativo|institucional)/, neg:/cadeira|poltrona/,
+             re:/microsoft|\boffice\b|\bm365\b|exchange|correio eletronico|e-?mails? (corporativo|institucional)/, neg:/cadeira|poltrona|office banking|home banking/,
              itemRe:/microsoft 365|\boffice\b|\bm365\b|exchange|licenca[^.]{0,40}microsoft|windows server/,
-             itemNeg:/cadeira|poltrona|curso|capacitacao|treinamento|^(notebook|computador|microcomputador|mini ?pc|desktop|all in one|tablet|smartphone|celular|estacao de trabalho)/ },
+             itemNeg:/cadeira|poltrona|banking|curso|capacitacao|treinamento|^(notebook|computador|microcomputador|mini ?pc|desktop|all in one|tablet|smartphone|celular|estacao de trabalho)/ },
   sup:     { grupo:"sup", nome:"Suporte TI",
              terms:['"suporte técnico"','"help desk"','"service desk"','"manutenção de computadores"','"manutenção preventiva e corretiva"','"assistência técnica"','"outsourcing de ti"','"terceirização de ti"','"tecnologia da informação"','"infraestrutura de ti"','"rede lógica"','"gerenciamento de rede"'],
              forte: ehSuporte, itemFn: () => false }  // suporte é serviço: vale o objeto, não a ficha de item
