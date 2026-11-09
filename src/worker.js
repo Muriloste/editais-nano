@@ -62,6 +62,14 @@ const SCHEMA = [
      pasta_pedida_em TEXT,
      pasta_concluida_em TEXT
    )`,
+  // cache das respostas do PNCP (itens, dados da compra, lista de arquivos): poupa o limite de acessos e serve cópia durante quedas
+  `CREATE TABLE IF NOT EXISTS cache_pncp (
+     chave TEXT PRIMARY KEY,
+     status INTEGER NOT NULL,
+     tipo TEXT,
+     corpo TEXT,
+     salvo_em INTEGER NOT NULL
+   )`,
   // ajustes gerais (ex.: "docs_mestre" = nomes dos arquivos da pasta-mestre de habilitação, lidos pela rodada)
   `CREATE TABLE IF NOT EXISTS ajustes (
      chave TEXT PRIMARY KEY,
@@ -77,14 +85,80 @@ const linhaPart = (r) => ({ ...r, snap: parseJ(r.snap), resumo: parseJ(r.resumo)
 
 // Proxy só de leitura para os documentos e itens do PNCP (evita CORS ao baixar PDFs/ZIPs no navegador)
 const PNCP_PERMITIDO = /^(api\/pncp\/v1\/orgaos\/\d{14}\/compras\/\d{4}\/\d+(\/arquivos(\/\d+)?|\/itens)?|api\/consulta\/v1\/orgaos\/\d{14}\/compras\/\d{4}\/\d+|pncp-api\/v1\/orgaos\/\d{14}\/compras\/\d{4}\/\d+\/arquivos(\/\d+)?)$/;
-async function proxyPncp(url) {
+// ---- proxy do PNCP com cache no D1 e pausa automática
+// itens 12 h, dados da compra 6 h, lista de arquivos 1 h; cópia vencida (até 7 dias) é servida se o PNCP limitar ou cair.
+// Ao receber 429 o proxy pausa aquela API por 5 min (503/timeout: 2 min) e não insiste nesse intervalo.
+const HORA = 3600 * 1000;
+function ttlCache(caminho) {
+  if (/\/itens$/.test(caminho)) return 12 * HORA;
+  if (/^api\/consulta\//.test(caminho)) return 6 * HORA;
+  if (/\/arquivos$/.test(caminho)) return 1 * HORA;
+  return 0; // downloads de documentos não vão para o cache
+}
+const familia = (caminho) => (/^api\/consulta\//.test(caminho) ? "consulta" : "pncp");
+const respCache = (row, estado) =>
+  new Response(row.corpo, { status: row.status, headers: { "content-type": row.tipo || "application/json", "cache-control": "no-store", "x-cache": estado } });
+
+async function proxyPncp(url, env, ctx) {
   const caminho = url.pathname.slice("/api/pncp-proxy/".length);
   if (!PNCP_PERMITIDO.test(caminho)) return json({ erro: "caminho do PNCP não permitido" }, 400);
-  const r = await fetch("https://pncp.gov.br/" + caminho + url.search, {
-    headers: { "user-agent": "editais-nano/1.0 (Nano TI; monitor de editais)" }
-  });
+  const db = env.DB || null;
+  if (db) await garantirTabelas(db);
+  const chave = caminho + url.search;
+  const ttl = ttlCache(caminho);
+  const agora = Date.now();
+  let guardado = null;
+  if (db && ttl) {
+    guardado = await db.prepare("SELECT status, tipo, corpo, salvo_em FROM cache_pncp WHERE chave = ?1").bind(chave).first();
+    if (guardado && agora - guardado.salvo_em < ttl) return respCache(guardado, "HIT");
+  }
+  const fam = familia(caminho);
+  let pausa = null;
+  if (db) {
+    const p = await db.prepare("SELECT valor FROM ajustes WHERE chave = ?1").bind("pncp_pausa_" + fam).first();
+    pausa = p ? parseJ(p.valor) : null;
+    if (pausa && pausa.ate > agora) {
+      if (guardado) return respCache(guardado, "STALE");
+      return new Response(JSON.stringify({ erro: "pncp_pausa", motivo: pausa.motivo, ate: new Date(pausa.ate).toISOString() }), {
+        status: 503, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-pncp-pausa": new Date(pausa.ate).toISOString() }
+      });
+    }
+  }
+  let r = null, falha = null;
+  try {
+    r = await fetch((env.PNCP_BASE || "https://pncp.gov.br/") + caminho + url.search, {
+      headers: { "user-agent": "editais-nano/1.0 (Nano TI; monitor de editais)" },
+      signal: AbortSignal.timeout(ttl ? 25000 : 90000)
+    });
+  } catch (e) { falha = "timeout"; }
+  if (!r || r.status === 429 || r.status >= 500) {
+    const motivo = r && r.status === 429 ? "limite" : "fora";
+    if (db) {
+      const ate = agora + (motivo === "limite" ? 5 : 2) * 60 * 1000;
+      ctx.waitUntil(db.prepare(
+        `INSERT INTO ajustes (chave, valor, atualizado_em) VALUES (?1, ?2, ?3) ON CONFLICT(chave) DO UPDATE SET valor = ?2, atualizado_em = ?3`
+      ).bind("pncp_pausa_" + fam, JSON.stringify({ ate, motivo, status: r ? r.status : falha }), new Date().toISOString()).run());
+    }
+    if (guardado) return respCache(guardado, "STALE");
+    if (!r) return json({ erro: "PNCP não respondeu (timeout)" }, 504);
+  }
   const h = new Headers({ "cache-control": "no-store" });
   for (const k of ["content-type", "content-disposition", "content-length"]) { const v = r.headers.get(k); if (v) h.set(k, v); }
+  if (db && ttl && r.status === 200) {
+    const corpo = await r.text();
+    h.delete("content-length");
+    if (corpo.length < 1800000) {
+      ctx.waitUntil((async () => {
+        await db.prepare(
+          `INSERT INTO cache_pncp (chave, status, tipo, corpo, salvo_em) VALUES (?1, 200, ?2, ?3, ?4)
+           ON CONFLICT(chave) DO UPDATE SET status = 200, tipo = ?2, corpo = ?3, salvo_em = ?4`
+        ).bind(chave, r.headers.get("content-type") || "application/json", corpo, agora).run();
+        if (Math.random() < 0.02) await db.prepare("DELETE FROM cache_pncp WHERE salvo_em < ?1").bind(agora - 7 * 24 * HORA).run();
+      })().catch(() => {}));
+    }
+    h.set("x-cache", "MISS");
+    return new Response(corpo, { status: 200, headers: h });
+  }
   return new Response(r.body, { status: r.status, headers: h });
 }
 
@@ -112,10 +186,10 @@ const texto = (v, max) => (v == null ? null : String(v).slice(0, max));
 const numero = (v) => (typeof v === "number" && isFinite(v) ? v : null);
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
-    if (url.pathname.startsWith("/api/pncp-proxy/") && request.method === "GET") return proxyPncp(url);
+    if (url.pathname.startsWith("/api/pncp-proxy/") && request.method === "GET") return proxyPncp(url, env, ctx);
     if (!env.DB) return json({ erro: "banco não configurado" }, 503);
     await garantirTabelas(env.DB);
 

@@ -438,6 +438,44 @@ async function fetchT(url, opts, ms){
   try{ return await fetch(url, { ...(opts || {}), signal: c.signal }); } finally { clearTimeout(t); }
 }
 
+// ---- consultas ao PNCP com pausa automática
+// Itens e dados da compra passam pelo servidor do monitor (cache compartilhado entre aparelhos); a busca vai direto.
+// Se o PNCP responder 429 (limite de acessos) ou 5xx (fora do ar), o monitor para de consultar por alguns minutos.
+const ITENS_URL = API ? "/api/pncp-proxy/api/pncp/v1/orgaos/" : ITENS;
+const CONSULTA_URL = API ? "/api/pncp-proxy/api/consulta/v1/orgaos/" : CONSULTA;
+let pncpPausa = { ate: 0, motivo: null };
+class PausaPNCP extends Error {}
+function pausarPNCP(motivo, ateIso){
+  const ate = ateIso ? new Date(ateIso).getTime() : Date.now() + (motivo === "limite" ? 5 : 2) * 60000;
+  if(ate > pncpPausa.ate) pncpPausa = { ate, motivo };
+}
+const emPausa = () => Date.now() < pncpPausa.ate;
+function textoPausa(){
+  const h = new Date(pncpPausa.ate).toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" });
+  return (pncpPausa.motivo === "limite" ? "O PNCP pediu uma pausa (limite de acessos)" : "O PNCP está fora do ar") + " — retomo às " + h;
+}
+async function pncpGet(url, ms){
+  if(emPausa()) throw new PausaPNCP();
+  let r;
+  try{ r = await fetchT(url, null, ms); }
+  catch(e){ if(e.name === "AbortError"){ pausarPNCP("fora"); throw new PausaPNCP(); } throw e; }
+  if(r.status === 429 || r.status >= 500){
+    pausarPNCP(r.status === 429 ? "limite" : "fora", r.headers.get("x-pncp-pausa"));
+    throw new PausaPNCP();
+  }
+  return r;
+}
+// retoma o que ficou pela metade quando a pausa acabar
+let retomarAgendado = null;
+function retomarDepoisDaPausa(){
+  if(retomarAgendado) return;
+  retomarAgendado = setTimeout(() => {
+    retomarAgendado = null;
+    if((window.__falhasBusca || 0) > 0 && !running) buscar();   // a busca ficou incompleta: refaz
+    else { verificarItens(); renderDepois(50); }
+  }, Math.max(5000, pncpPausa.ate - Date.now() + 5000));
+}
+
 async function buscar(){
   if(running) return; running = true;
   $("#btnAtualizar").disabled = true;
@@ -448,7 +486,7 @@ async function buscar(){
     const base = SEARCH + "?q=" + encodeURIComponent(t) + "&tipos_documento=edital&ordenacao=-data&tam_pagina=500&status=recebendo_proposta" + (soSup ? "&ufs=" + UFS_SUP : "");
     let todos = [];
     for(let p = 1; p <= 4; p++){
-      const r = await fetchT(base + "&pagina=" + p, null, 30000);
+      const r = await pncpGet(base + "&pagina=" + p, 30000);
       if(!r.ok) throw new Error("HTTP "+r.status);
       const j = await r.json(); const its = j.items || [];
       todos = todos.concat(its);
@@ -457,7 +495,7 @@ async function buscar(){
     return { cats, items: todos };
   });
   let falhas = 0;
-  const res = await pool(jobs, 6, (d,n) => setStatus("Buscando no PNCP… "+d+"/"+n));
+  const res = await pool(jobs, 4, (d,n) => setStatus(emPausa() ? textoPausa() : "Buscando no PNCP… "+d+"/"+n));
   const fresh = new Map();
   const agora = Date.now();
   for(const r of res){
@@ -522,7 +560,7 @@ async function verificarItens(){
     await pool(cand.map(rec => async () => {
       const it = rec.it; let arr = [];
       for(let p = 1; p <= 4; p++){
-        const r = await fetchT(ITENS + it.orgao_cnpj + "/compras/" + it.ano + "/" + it.numero_sequencial + "/itens?pagina=" + p + "&tamanhoPagina=500", null, 20000);
+        const r = await pncpGet(ITENS_URL + it.orgao_cnpj + "/compras/" + it.ano + "/" + it.numero_sequencial + "/itens?pagina=" + p + "&tamanhoPagina=500", 20000);
         if(!r.ok) throw new Error("HTTP " + r.status);
         const j = await r.json(); const a = Array.isArray(j) ? j : (j.data || []);
         arr = arr.concat(a); if(a.length < 500) break;
@@ -537,7 +575,7 @@ async function verificarItens(){
       itensCache[rec.id] = { t: Date.now(), m };
       aplicaItens(rec, m);
       if(Object.keys(m).length) renderDepois(1200);
-    }), 6, (d,n) => setStatus("Conferindo itens dos editais… " + d + "/" + n));
+    }), 4, (d,n) => setStatus(emPausa() ? textoPausa() : "Conferindo itens dos editais… " + d + "/" + n));
     const ks = Object.keys(itensCache);
     if(ks.length > 1500) ks.sort((a,b) => itensCache[a].t - itensCache[b].t).slice(0, ks.length - 1500).forEach(k => delete itensCache[k]);
     store.set("itens", itensCache);
@@ -545,7 +583,8 @@ async function verificarItens(){
   atualizaSnaps();
   treinar();
   const f = window.__falhasBusca || 0;
-  setStatus(f ? "Atualizado com " + f + " falha(s) na busca — tente de novo." : "Atualizado às " + horaAgora());
+  if(emPausa()){ setStatus(textoPausa()); retomarDepoisDaPausa(); }
+  else setStatus(f ? "Atualizado com " + f + " falha(s) na busca — tente de novo." : "Atualizado às " + horaAgora());
   renderDepois(50);
   verifRodando = false;
   if(verifPendente){ verifPendente = false; verificarItens(); }
@@ -883,16 +922,33 @@ function render(){
 }
 
 let detRun = 0;
+// só os campos que a tela usa, guardados 6 h no aparelho (abrir de novo não consulta o PNCP outra vez)
+const DET_TTL = 6 * 3600 * 1000;
+let detCache = store.get("det", {});
+for(const [id, v] of Object.entries(detCache)){ if(Date.now() - v.t < DET_TTL) details.set(id, v.d); else delete detCache[id]; }
+let detSalvar = null;
+function guardaDetalhe(id, d){
+  const slim = { valorTotalEstimado: d.valorTotalEstimado || null, linkSistemaOrigem: d.linkSistemaOrigem || null, usuarioNome: d.usuarioNome || null };
+  details.set(id, slim); detCache[id] = { t: Date.now(), d: slim };
+  clearTimeout(detSalvar);
+  detSalvar = setTimeout(() => {
+    const ks = Object.keys(detCache);
+    if(ks.length > 1500) ks.sort((a, b) => detCache[a].t - detCache[b].t).slice(0, ks.length - 1500).forEach(k => delete detCache[k]);
+    store.set("det", detCache);
+  }, 1500);
+}
 async function carregarDetalhes(recs){
+  if(emPausa()){ retomarDepoisDaPausa(); return; }
   const falta = recs.filter(r => !details.has(r.id));
   if(!falta.length) return;
   const myRun = ++detRun;
   await pool(falta.map(rec => async () => {
-    if(details.has(rec.id)) return;
+    if(details.has(rec.id) || emPausa()) return;
     const it = rec.it;
-    const r = await fetchT(CONSULTA + it.orgao_cnpj + "/compras/" + it.ano + "/" + it.numero_sequencial, null, 15000);
-    details.set(rec.id, r.ok ? await r.json() : {});
-  }), 4);
+    const r = await pncpGet(CONSULTA_URL + it.orgao_cnpj + "/compras/" + it.ano + "/" + it.numero_sequencial, 15000);
+    if(r.ok) guardaDetalhe(rec.id, await r.json()); else details.set(rec.id, {});
+  }), 3);
+  if(emPausa()) retomarDepoisDaPausa();
   if(myRun === detRun) renderDepois();
 }
 

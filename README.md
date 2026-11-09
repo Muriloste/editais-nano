@@ -27,7 +27,16 @@ Marcações de interesse e descarte (com motivo) ficam num banco D1 e alimentam 
 - `POST /api/participacoes/:id/pasta` — pede a pasta/checklist de novo; `PUT .../pasta` — a rodada grava `{pasta_status, pasta_url, pasta_id, checklist_url, resumo, erro}`.
 - `PUT /api/participacoes/:id/arquivo` — a rodada informa `{status: feito|erro, pasta_url}` depois de mover a pasta para ARQUIVADOS.
 - `GET|PUT /api/docs-mestre` — nomes dos arquivos da pasta-mestre (`{nomes, pasta_url}`), gravados pela rodada com `nanoAnalise.documentos(nomes)`; a página lê `(val …)`/`(emitida …)` e mostra o aviso de certidões.
-- `GET /api/pncp-proxy/...` — proxy só de leitura para itens e documentos do PNCP (download de PDF/ZIP sem CORS).
+- `GET /api/pncp-proxy/...` — proxy só de leitura do PNCP (itens, dados da compra, arquivos e download de PDF/ZIP sem CORS).
+  Cache no D1 (`cache_pncp`): itens 12 h, dados da compra 6 h, lista de arquivos 1 h; cópia vencida (até 7 dias) é servida
+  quando o PNCP limita (429) ou cai (5xx). Ao receber 429 a API daquela família pausa 5 min (5xx/timeout: 2 min) — header `x-pncp-pausa`.
+  Downloads de documentos não são guardados.
+
+## Limites do PNCP
+- A busca (`/api/search`) vai direto do navegador; itens e dados da compra passam pelo servidor (cache compartilhado entre aparelhos)
+  e os dados da compra ficam 6 h no aparelho. Uma abertura repetida não consulta o PNCP de novo.
+- Se o PNCP responder 429/5xx, a tela para de consultar, mostra "O PNCP pediu uma pausa… retomo às HH:MM" e retoma sozinha.
+- Rodando análises em paralelo fora da rodada agendada: no máximo 3 ao mesmo tempo.
 
 ## Pré-análise
 O botão "🔍 Pedir pré-análise" no card coloca o edital na fila. A rodada agendada no Claude (dias úteis, 7h06 e 13h06, até 5 por rodada)
